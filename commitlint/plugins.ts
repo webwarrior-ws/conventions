@@ -458,7 +458,14 @@ export abstract class Plugins {
                             nextWordLength + line.length + 1 >
                             paragraphLineMaxLength;
 
-                        if (!isUrl && !lineIsFooterNote && !isNextWordTooLong) {
+                        let isLastCharAColon = line[line.length - 1] === ":";
+
+                        if (
+                            !isUrl &&
+                            !lineIsFooterNote &&
+                            !isNextWordTooLong &&
+                            !isLastCharAColon
+                        ) {
                             offence = true;
                             break;
                         }
