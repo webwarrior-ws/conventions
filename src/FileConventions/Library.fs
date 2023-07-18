@@ -214,6 +214,7 @@ let private WrapParagraph (text: string) (maxCharsPerLine: int) : string =
               } when
                 String.length currentLine + word.Text.Length + 1
                 <= maxCharsPerLine
+                && not(currentLine.EndsWith ":" && Char.IsUpper word.Text.[0])
                 ->
                 processWords (currentLine + " " + word.Text) wrappedText rest
             | _,

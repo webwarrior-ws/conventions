@@ -90,14 +90,19 @@ let WrapTextTest5() =
         "Fixed bug (a title of less than 50 chars)"
         + Environment.NewLine
         + Environment.NewLine
-        + "These were the steps to reproduce:" + Environment.NewLine
-        + "Do foo." + Environment.NewLine
+        + "These were the steps to reproduce:"
         + Environment.NewLine
-        + "Current results:" + Environment.NewLine
-        + "Bar happens." + Environment.NewLine
+        + "Do foo."
         + Environment.NewLine
-        + "Expected results:" + Environment.NewLine +
-        "Baz happens."
+        + Environment.NewLine
+        + "Current results:"
+        + Environment.NewLine
+        + "Bar happens."
+        + Environment.NewLine
+        + Environment.NewLine
+        + "Expected results:"
+        + Environment.NewLine
+        + "Baz happens."
 
     let expectedResult = text
 
