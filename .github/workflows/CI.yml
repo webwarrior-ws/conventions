@@ -87,7 +87,7 @@ jobs:
       - name: Install yarn
         run: |
           npm install --global yarn
-          yarn add --dev jest typescript ts-jest @types/jest
+          yarn add --dev jest typescript@4.9 ts-jest @types/jest
       - name: Install commitlint
         run: |
           npm install conventional-changelog-conventionalcommits
@@ -99,6 +99,7 @@ jobs:
           npm --version
           npx commitlint --version
           yarn --version
+          npx tsc --version
       - name: Run typescript compiler
         # This step is needed because jest will swallow any compiler error 
         # and just declare test as failed without any explanation.
