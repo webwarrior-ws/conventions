@@ -1,4 +1,4 @@
-import { runCommitLintOnMsg } from "./test_helpers";
+import { runCommitLintOnMsg } from "./testHelpers";
 
 test("body-prose1", () => {
     let commitMsgWithLowercaseBodyStart = `foo: this is only a title
