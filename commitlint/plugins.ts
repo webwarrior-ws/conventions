@@ -43,7 +43,7 @@ export abstract class Plugins {
                         return true;
                     }
                     return false;
-                }
+                };
 
                 for (let paragraph of Helpers.splitByEOLs(bodyStr, 2)) {
                     paragraph = paragraph.trim();

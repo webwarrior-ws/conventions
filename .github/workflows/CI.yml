@@ -101,7 +101,7 @@ jobs:
           yarn --version
           npx tsc --version
       - name: Run typescript compiler
-        # This step is needed because jest will swallow any compiler error 
+        # This step is needed because jest will swallow any compiler error
         # and just declare test as failed without any explanation.
         run: npx tsc --downlevelIteration
       - name: Run tests to validate our plugins
