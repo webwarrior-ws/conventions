@@ -456,12 +456,17 @@ export abstract class Plugins {
                         continue;
                     }
 
-                    if ((!bulletsAllowedNow) &&
-                        ((i == 0 && Helpers.lineStartsWithBullet(line) || line.endsWith(":")))) {
+                    if (
+                        !bulletsAllowedNow &&
+                        ((i == 0 && Helpers.lineStartsWithBullet(line)) ||
+                            line.endsWith(":"))
+                    ) {
                         bulletsAllowedNow = true;
                         alwaysBulletsSoFar = true;
                     } else if (bulletsAllowedNow) {
-                        alwaysBulletsSoFar = alwaysBulletsSoFar && Helpers.lineStartsWithBullet(line);
+                        alwaysBulletsSoFar =
+                            alwaysBulletsSoFar &&
+                            Helpers.lineStartsWithBullet(line);
                     }
 
                     if (line.length < paragraphLineMinLength) {
@@ -511,6 +516,7 @@ export abstract class Plugins {
 
         let lines = Helpers.splitByEOLs(rawStr, 1);
         let inCodeBlock = false;
+        let allowedBulletChars = ["*", "-"];
         for (let line of lines) {
             if (Helpers.isCodeBlockDelimiter(line)) {
                 inCodeBlock = !inCodeBlock;
@@ -520,7 +526,10 @@ export abstract class Plugins {
                 continue;
             }
 
-            if (line[0] == " " || line[0] == "\t") {
+            if (
+                (line[0] == " " || line[0] == "\t") &&
+                !(line.length > 1 && allowedBulletChars.includes(line[1]))
+            ) {
                 offence = true;
                 break;
             }

@@ -82,10 +82,13 @@ export abstract class Helpers {
 
     public static lineStartsWithBullet(line: string) {
         Helpers.assertLine(line);
-        let allowedBulletChars = ['*', '-'];
+        let allowedBulletChars = ["*", "-"];
         for (let bulletChar of allowedBulletChars) {
             let simplePattern = bulletChar + " ";
-            if (line.startsWith(simplePattern) && line.length > simplePattern.length)
+            if (
+                line.startsWith(simplePattern) &&
+                line.length > simplePattern.length
+            )
                 return true;
 
             let pattern = " " + bulletChar + " ";
