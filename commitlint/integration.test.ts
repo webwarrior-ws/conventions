@@ -1,4 +1,4 @@
-import { runCommitLintOnMsg } from "./testHelpers";
+import { runCommitLintOnMsg } from "./testHelpers.js";
 
 test("body-leading-blank1", () => {
     let commitMsgWithoutEmptySecondLine =
