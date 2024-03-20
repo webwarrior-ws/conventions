@@ -104,7 +104,7 @@ jobs:
         run: npx tsc
       - name: Run typescript compiler on test files
         run: |
-          cd commitlint-tests
+          cd commitlint/tests
           npx tsc
 
   commitlint-plugins-tests:
@@ -134,7 +134,7 @@ jobs:
       - name: Run typescript compiler
         run: |
           npx tsc
-          cd commitlint-tests
+          cd commitlint/tests
           npx tsc
       - name: Print versions
         run: |

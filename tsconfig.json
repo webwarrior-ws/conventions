@@ -6,5 +6,5 @@
         "downlevelIteration": true,
         "module": "node16"
     },
-    "exclude": ["jest.config.ts", "commitlint-tests"]
+    "exclude": ["jest.config.ts", "commitlint/tests"]
 }
