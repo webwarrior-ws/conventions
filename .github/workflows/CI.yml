@@ -89,8 +89,8 @@ jobs:
           npm --version
       - name: Install yarn
         run: |
-          npm install --verboase --global yarn
-          yarn add --dev jest typescript ts-jest @types/jest
+          npm install --verbose --global yarn
+          yarn add --dev typescript
       - name: Install commitlint dependencies
         run: |
           . commitlint/version.config
@@ -126,7 +126,7 @@ jobs:
       - name: Install yarn
         run: |
           npm install --verbose --global yarn
-          yarn add --dev jest typescript ts-jest @types/jest ts-node
+          yarn add --dev typescript ts-node
       - name: Install commitlint dependencies
         run: |
           . commitlint/version.config
@@ -146,7 +146,7 @@ jobs:
       - name: Install commitlint
         run: ./commitlint.sh --version
       - name: Run tests to validate our plugins
-        run: yarn jest --config jest.config.ts
+        run: yarn test
 
   sanity-check:
     name: Sanity check
