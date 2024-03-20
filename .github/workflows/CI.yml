@@ -102,6 +102,10 @@ jobs:
           npm --version
       - name: Run typescript compiler
         run: npx tsc
+      - name: Run typescript compiler on test files
+        run: |
+          cd commitlint-tests
+          npx tsc
 
   commitlint-plugins-tests:
     name: Run commitlint-related tests
@@ -128,7 +132,10 @@ jobs:
           . commitlint/version.config
           npm install --verbose @commitlint/types@$COMMITLINT_VERSION
       - name: Run typescript compiler
-        run: npx tsc
+        run: |
+          npx tsc
+          cd commitlint-tests
+          npx tsc
       - name: Print versions
         run: |
           git --version
