@@ -1,3 +1,6 @@
+
+import { None, Some, Option, OptionStatic, TypeHelpers } from "./fpHelpers.js";
+
 export abstract class Helpers {
     public static errMessageSuffix =
         "\nFor reference, these are the guidelines that include our commit message conventions: https://github.com/nblockchain/conventions/blob/master/docs/WorkflowGuidelines.md";
@@ -16,9 +19,22 @@ export abstract class Helpers {
     }
 
     // to convert from 'any' type
-    public static convertAnyToString(potentialString: any): string | null {
-        // this null/undefined check is required, otherwise, String(null) might give us the stupid string "null"
-        return potentialString ? String(potentialString) : null;
+    public static convertAnyToString(potentialString: any): Option<string> {
+        // this type check is required, otherwise, String(null) would give us the stupid string "null"
+        if (TypeHelpers.IsInstanceOf(potentialString, String)){
+            return new Some(String(potentialString));
+        }
+        return OptionStatic.None;
+    }
+
+    public static assertNotNone(
+        text: Option<string>,
+        errorMessage: string
+    ): string {
+        if (text instanceof None) {
+            throw new Error(errorMessage);
+        }
+        return text.value;
     }
 
     public static assertNotNull(
