@@ -54,6 +54,9 @@ export class TypeHelpers {
     // because instanceof doesn't work with primitive types (e.g. String), taken from https://stackoverflow.com/a/58184883/544947
     public static IsInstanceOf(variable: any, type: any) {
         let res: boolean = false;
+        // null and undefined don't have constructor property
+        if (variable === null) return type === null;
+        if (variable === undefined) return type === undefined;
         if (typeof type == "string") {
             res = typeof variable == type.toLowerCase();
         } else {
