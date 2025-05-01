@@ -765,7 +765,12 @@ Bla bla blah[1].
 http://foo.bar/baz`;
 
     const footerRefsValidity5 = runCommitLintOnMsg(commmitMsgWithEOLFooter);
-    expect(footerRefsValidity5.output[1].toString().includes("EOL")).toBe(true);
+    const output1 = footerRefsValidity5.output[1];
+    expect(output1).not.toBeNull();
+    if (output1 === null) { // redundant, but TypeScript compiler produces error otherwise
+        return;
+    }
+    expect(output1.toString().includes("EOL")).toBe(true);
 });
 
 test("footer-refs-validity6", () => {
