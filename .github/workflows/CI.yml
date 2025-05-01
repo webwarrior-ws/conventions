@@ -102,7 +102,7 @@ jobs:
           node --version
           npm --version
       - name: Run typescript-eslint
-        run: npx eslint .          
+        run: npx eslint .
       - name: Run typescript compiler
         run: npx tsc
 

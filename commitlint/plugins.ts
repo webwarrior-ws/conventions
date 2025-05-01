@@ -6,7 +6,8 @@ export abstract class Plugins {
     public static bodyProse(rawStr: string) {
         function paragraphHasValidEnding(paragraph: string): boolean {
             const paragraphWords = paragraph.split(" ");
-            const lastWordInParagraph = paragraphWords[paragraphWords.length - 1];
+            const lastWordInParagraph =
+                paragraphWords[paragraphWords.length - 1];
             const isParagraphEndingWithUrl =
                 Helpers.isValidUrl(lastWordInParagraph);
             if (isParagraphEndingWithUrl) {
@@ -54,9 +55,12 @@ export abstract class Plugins {
                         continue;
                     }
 
-                    const startWithLowerCase = Helpers.isLowerCase(paragraph[0]);
+                    const startWithLowerCase = Helpers.isLowerCase(
+                        paragraph[0]
+                    );
 
-                    const validParagraphEnd = paragraphHasValidEnding(paragraph);
+                    const validParagraphEnd =
+                        paragraphHasValidEnding(paragraph);
 
                     const lines = Helpers.splitByEOLs(paragraph, 1);
 
@@ -490,7 +494,8 @@ export abstract class Plugins {
 
                         const lineIsFooterNote = Helpers.isFooterNote(line);
 
-                        const nextWordLength = lines[i + 1].split(" ")[0].length;
+                        const nextWordLength =
+                            lines[i + 1].split(" ")[0].length;
                         const isNextWordTooLong =
                             nextWordLength + line.length + 1 >
                             paragraphLineMaxLength;

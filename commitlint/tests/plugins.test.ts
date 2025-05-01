@@ -70,7 +70,9 @@ Bar baz:
 
 Blah blah.`;
 
-    const bodyProse7 = runCommitLintOnMsg(commitMsgWithParagraphEndingWithColon);
+    const bodyProse7 = runCommitLintOnMsg(
+        commitMsgWithParagraphEndingWithColon
+    );
 
     // because paragraphs can end with a colon
     expect(bodyProse7.status).toBe(0);
@@ -653,7 +655,9 @@ Fixes https://some/issue
 
 [1] http://foo.bar/baz`;
 
-    const footerNotesMisplacement1 = runCommitLintOnMsg(commitMsgWithRightFooter);
+    const footerNotesMisplacement1 = runCommitLintOnMsg(
+        commitMsgWithRightFooter
+    );
     expect(footerNotesMisplacement1.status).toBe(0);
 });
 
@@ -666,7 +670,9 @@ Bla bla blah[1].
 
 [1] http://foo.bar/baz`;
 
-    const footerNotesMisplacement2 = runCommitLintOnMsg(commitMsgWithWrongFooter);
+    const footerNotesMisplacement2 = runCommitLintOnMsg(
+        commitMsgWithWrongFooter
+    );
     expect(footerNotesMisplacement2.status).not.toBe(0);
 });
 
@@ -681,7 +687,9 @@ Some other bla bla blah.
 
 Fixes https://some/issue`;
 
-    const footerNotesMisplacement3 = runCommitLintOnMsg(commitMsgWithWrongFooter);
+    const footerNotesMisplacement3 = runCommitLintOnMsg(
+        commitMsgWithWrongFooter
+    );
     expect(footerNotesMisplacement3.status).not.toBe(0);
 });
 
@@ -694,7 +702,9 @@ test("footer-notes-misplacement-4", () => {
         "Some other bla bla blah.\n\n" +
         "Fixes https://some/issue";
 
-    const footerNotesMisplacement4 = runCommitLintOnMsg(commitMsgWithWrongFooter);
+    const footerNotesMisplacement4 = runCommitLintOnMsg(
+        commitMsgWithWrongFooter
+    );
     expect(footerNotesMisplacement4.status).not.toBe(0);
 });
 
@@ -704,7 +714,9 @@ test("footer-notes-misplacement-5", () => {
         "Bla bla blah[1]:\n\n" +
         "```\nSome error message with a [] in the first of its line\n[warn] some warning\n```\n\n" +
         "[1] http://foo.bar/baz";
-    const footerNotesMisplacement5 = runCommitLintOnMsg(commitMsgWithRightFooter);
+    const footerNotesMisplacement5 = runCommitLintOnMsg(
+        commitMsgWithRightFooter
+    );
     console.log(footerNotesMisplacement5.stdout.toString());
     expect(footerNotesMisplacement5.status).toBe(0);
 });
@@ -767,7 +779,8 @@ http://foo.bar/baz`;
     const footerRefsValidity5 = runCommitLintOnMsg(commmitMsgWithEOLFooter);
     const output1 = footerRefsValidity5.output[1];
     expect(output1).not.toBeNull();
-    if (output1 === null) { // redundant, but TypeScript compiler produces error otherwise
+    if (output1 === null) {
+        // redundant, but TypeScript compiler produces error otherwise
         return;
     }
     expect(output1.toString().includes("EOL")).toBe(true);
@@ -831,7 +844,9 @@ test("footer-refs-validity9", () => {
 
 test("prefer-slash-over-backslash1", () => {
     const commitMsgWithBackslash = "foo\\bar: bla bla bla";
-    const preferSlashOverBackslash1 = runCommitLintOnMsg(commitMsgWithBackslash);
+    const preferSlashOverBackslash1 = runCommitLintOnMsg(
+        commitMsgWithBackslash
+    );
     expect(preferSlashOverBackslash1.status).not.toBe(0);
 });
 
@@ -1048,7 +1063,9 @@ test("subject-lowercase2", () => {
 
 test("subject-lowercase3", () => {
     const commitMsgWithAcronymAfterColon = "foo: BAR baz";
-    const subjectLowerCase3 = runCommitLintOnMsg(commitMsgWithAcronymAfterColon);
+    const subjectLowerCase3 = runCommitLintOnMsg(
+        commitMsgWithAcronymAfterColon
+    );
     expect(subjectLowerCase3.status).toBe(0);
 });
 
@@ -1088,7 +1105,8 @@ test("subject-lowercase8", () => {
 });
 
 test("subject-lowercase9", () => {
-    const commitMsgWithCamelCaseAfterColon = "End2End: testFixtureSetup refactor";
+    const commitMsgWithCamelCaseAfterColon =
+        "End2End: testFixtureSetup refactor";
     const subjectLowerCase9 = runCommitLintOnMsg(
         commitMsgWithCamelCaseAfterColon
     );
@@ -1127,7 +1145,9 @@ test("title-uppercase4", () => {
 
 test("too-many-spaces1", () => {
     const commitMsgWithTooManySpacesInTitle = "foo: this is only a  title";
-    const tooManySpaces1 = runCommitLintOnMsg(commitMsgWithTooManySpacesInTitle);
+    const tooManySpaces1 = runCommitLintOnMsg(
+        commitMsgWithTooManySpacesInTitle
+    );
     expect(tooManySpaces1.status).not.toBe(0);
 });
 
