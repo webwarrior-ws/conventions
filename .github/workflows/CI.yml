@@ -91,7 +91,7 @@ jobs:
       - name: Install yarn
         run: |
           npm install --verbose --global yarn
-          yarn add --dev typescript
+          yarn add --dev typescript eslint @eslint/js typescript-eslint
       - name: Install commitlint dependencies
         run: |
           . commitlint/version.config
@@ -101,6 +101,8 @@ jobs:
           git --version
           node --version
           npm --version
+      - name: Run typescript-eslint
+        run: npx eslint .          
       - name: Run typescript compiler
         run: npx tsc
 
