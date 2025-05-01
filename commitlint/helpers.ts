@@ -12,11 +12,12 @@ export abstract class Helpers {
         // Borrowed from https://www.freecodecamp.org/news/check-if-a-javascript-string-is-a-url/
         try {
             return Boolean(new URL(text));
-        } catch (e) {
+        } catch {
             return false;
         }
     }
 
+    /* eslint @typescript-eslint/no-explicit-any: "off" */
     // to convert from 'any' type
     public static convertAnyToString(potentialString: any): Option<string> {
         if (TypeHelpers.IsNullOrUndefined(potentialString)) {

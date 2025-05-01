@@ -1,7 +1,7 @@
 import { test, expect } from "vitest";
 import { None, Some, Option, OptionStatic, TypeHelpers } from "../fpHelpers.js";
-const { spawnSync } = require("child_process");
-const os = require("os");
+import { spawnSync } from "child_process";
+import os from "os";
 
 function typeGuard(option: Option<number>) {
     if (option instanceof None) {
