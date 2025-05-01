@@ -1,3 +1,5 @@
+/* eslint @typescript-eslint/no-explicit-any: "off" */
+
 import { Helpers } from "./commitlint/helpers.js";
 import { Plugins } from "./commitlint/plugins.js";
 import { RuleConfigSeverity } from "@commitlint/types";

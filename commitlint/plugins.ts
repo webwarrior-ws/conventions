@@ -410,6 +410,7 @@ export abstract class Plugins {
                         const lineIsFooterNote = Helpers.isFooterNote(line);
 
                         const commitHashPattern = `([0-9a-f]{40})`;
+                        /* eslint no-useless-escape: "off" -- escapes needed because this string is used as part of Regex */
                         const anySinglePunctuationCharOrNothing = `[\.\,\:\;\?\!]?`;
                         const index = line.search(
                             commitHashPattern +

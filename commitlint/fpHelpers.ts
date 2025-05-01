@@ -1,3 +1,5 @@
+/* eslint @typescript-eslint/no-explicit-any: "off" */
+
 interface IOption {
     /**
      * @deprecated it is better to use `if (foo instanceof None)` so that you can access the .value in the `else` case
