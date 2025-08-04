@@ -1,7 +1,8 @@
 {
     "type": "module",
     "dependencies": {
-        "cosmiconfig": "9.0.0"
+        "cosmiconfig": "9.0.0",
+        "typescript": "5.8.4"
     },
     "devDependencies": {
         "vitest": "^1.3.1"
