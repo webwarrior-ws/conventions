@@ -362,6 +362,7 @@ let private GetVersionsMapFromFiles
 let private DetectInconsistentVersionsInYamlFiles
     (fileInfos: seq<FileInfo>)
     (extractVersionsFunction: YamlNode -> seq<string * string>)
+    (globalEnv: Map<string, string>)
     =
     let envVarRegex =
         Regex(@"\s*\$\{\{\s*([^\s\}]+)\s*\}\}\s*", RegexOptions.Compiled)
@@ -382,6 +383,18 @@ let private DetectInconsistentVersionsInYamlFiles
                 let matches =
                     Seq.collect extractVersionsFunction yamlDoc.AllNodes
 
+                let yamlDict = yamlDoc :?> YamlMappingNode
+                let localEnv = 
+                    match yamlDict.Children.TryGetValue "env" with
+                    | true, (:? YamlMappingNode as node) -> node
+                    | _ -> YamlMappingNode()
+
+                let envDict =
+                    localEnv.Children
+                    |> Seq.fold
+                        (fun acc pair -> acc |> Map.add (pair.Key :?> YamlScalarNode).Value (pair.Value:?> YamlScalarNode).Value)
+                        globalEnv
+                
                 matches
                 |> Seq.fold
                     (fun acc (key, value) ->
@@ -389,12 +402,6 @@ let private DetectInconsistentVersionsInYamlFiles
                             let variableRegexMatch = envVarRegex.Match value
 
                             if variableRegexMatch.Success then
-                                let yamlDict = yamlDoc :?> YamlMappingNode
-
-                                let envDict =
-                                    yamlDict.Children.["env"]
-                                    :?> YamlMappingNode
-
                                 let referenceString =
                                     variableRegexMatch.Groups.[1].Value
 
@@ -404,10 +411,9 @@ let private DetectInconsistentVersionsInYamlFiles
                                     else
                                         referenceString
 
-                                match envDict.Children.TryGetValue envVarName
-                                    with
+                                match envDict.TryGetValue envVarName with
                                 | true, envVarValue ->
-                                    (envVarValue :?> YamlScalarNode).Value
+                                    envVarValue
                                 | false, _ ->
                                     failwithf "env. var %s not found" envVarName
                             else
@@ -427,7 +433,7 @@ let private DetectInconsistentVersionsInYamlFiles
     |> Seq.map(fun item -> Seq.length item.Value > 1)
     |> Seq.contains true
 
-let DetectInconsistentVersionsInGitHubCIWorkflow(fileInfos: seq<FileInfo>) =
+let DetectInconsistentVersionsInGitHubCIWorkflow (fileInfos: seq<FileInfo>) (globalEnv: Map<string, string>) =
     fileInfos
     |> Seq.iter(fun fileInfo -> assert (fileInfo.FullName.EndsWith ".yml"))
 
@@ -463,15 +469,15 @@ let DetectInconsistentVersionsInGitHubCIWorkflow(fileInfos: seq<FileInfo>) =
             )
         | _ -> Seq.empty
 
-    DetectInconsistentVersionsInYamlFiles fileInfos extractVersions
+    DetectInconsistentVersionsInYamlFiles fileInfos extractVersions globalEnv
 
-let DetectInconsistentVersionsInGitHubCI(dir: DirectoryInfo) =
+let DetectInconsistentVersionsInGitHubCI (dir: DirectoryInfo) (globalEnv: Map<string, string>) =
     let ymlFiles = dir.GetFiles("*.yml", SearchOption.AllDirectories)
 
     if Seq.isEmpty ymlFiles then
         false
     else
-        DetectInconsistentVersionsInGitHubCIWorkflow ymlFiles
+        DetectInconsistentVersionsInGitHubCIWorkflow ymlFiles globalEnv
 
 let GetVersionsMapForNugetRefsInFSharpScripts(fileInfos: seq<FileInfo>) =
     fileInfos
