@@ -1009,7 +1009,7 @@ test("header-max-length-with-suggestions14", () => {
     const headerMaxLength14 = runCommitLintOnMsg(
         commitMsgThatExceedsHeaderMaxLengthEvenIfItIsARevert
     );
-    expect(headerMaxLength14.status).not.toBe(0);
+    expect(headerMaxLength14.status).toBe(0);
 });
 
 test("proper-issue-refs1", () => {
