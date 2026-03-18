@@ -106,7 +106,10 @@ export default {
                     _: any,
                     maxLineLength: number
                 ) => {
-                    const rawStr = extractStringFromCommitlintParam("rawStr", raw);
+                    const rawStr = extractStringFromCommitlintParam(
+                        "rawStr",
+                        raw
+                    );
 
                     return Plugins.headerMaxLengthWithSuggestions(
                         rawStr,
