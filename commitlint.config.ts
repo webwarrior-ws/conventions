@@ -25,6 +25,10 @@ function extractStringFromCommitlintParam(
 
 export default {
     parserPreset: "conventional-changelog-conventionalcommits",
+    // defaultIgnores interferes with header-max-length-with-suggestions since it disables commitlint for messages that
+    // start with "Revert", see
+    // See https://github.com/conventional-changelog/commitlint/blob/5a3ebf5fc687db4af39a2e82d1a631af91fee29d/docs/reference/configuration.md?plain=1#L65
+    defaultIgnores: false,
     rules: {
         "body-leading-blank": [RuleConfigSeverity.Error, "always"],
         "body-soft-max-line-length": [
