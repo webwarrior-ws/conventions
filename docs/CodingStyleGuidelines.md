@@ -308,36 +308,36 @@
 
     * Empty catch‑all blocks: if you really can't use a specific exception in your catch block and the catch has to capture any kind of exception, DO NOT leave the catch block completely empty. At minimum, log the exception with its details. And if logging it truly doesn't make sense, include a comment explaining why logging is omitted, why a catch‑all is needed, and why it's safe to swallow the exception.
 
-        Example (bad):
-        ```csharp
-        try {
-            SomeOperation();
-        } catch (Exception) {
-        }
-        ```
+    Example (bad):
+    ```csharp
+    try {
+        SomeOperation();
+    } catch (Exception) {
+    }
+    ```
 
-        Improved code (preferred — log the exception):
-        ```csharp
-        try {
-            SomeOperation();
-        } catch (Exception ex) {
-            // This catch-all is intentional because the operation is non‑critical
-            Logger.Warn(ex, "Non‑critical operation failed; proceeding without aborting.");
-        }
-        ```
+    Improved code (preferred — log the exception):
+    ```csharp
+    try {
+        SomeOperation();
+    } catch (Exception ex) {
+        // This catch-all is intentional because the operation is non‑critical
+        Logger.Warn(ex, "Non‑critical operation failed; proceeding without aborting.");
+    }
+    ```
 
-        Improved code (when logging doesn't apply — explain why):
-        ```csharp
-        try {
-            SomeOperation();
-        } catch {
-            // Logging is not appropriate here because the exception may contain
-            // sensitive credential data that must not be written to logs.
-            // This catch-all is needed because the third‑party library does not
-            // document which exception types it throws, and the operation is
-            // safe to skip without side effects.
-        }
-        ```
+    Improved code (when logging doesn't apply — explain why):
+    ```csharp
+    try {
+        SomeOperation();
+    } catch {
+        // Logging is not appropriate here because the exception may contain
+        // sensitive credential data that must not be written to logs.
+        // This catch-all is needed because the third‑party library does not
+        // document which exception types it throws, and the operation is
+        // safe to skip without side effects.
+    }
+    ```
 
     * Catching preventable exceptions: some exceptions are avoidable and should be prevented by checks instead of being caught.
 
@@ -384,72 +384,118 @@
     }
     ```
 
-    * Not benefiting from your type system: we use statically-typed languages (such as TypeScript and C#) to let the compiler protect us. Use the type system rather than sentinel/edge values. For example, do not use `DateTime.MinValue` to denote absence—use a nullable or Option type. Do not use `undefined` in TypeScript; use explicit option/nullable patterns instead.
+    * Not benefiting from your type system: we use statically-typed languages (such as TypeScript and C#) to let the compiler protect us. See many examples of this below.
 
-    Example (bad):
-    ```typescript
-    if (foo === undefined || foo === null)
-    {
-        return 0;
-    }
-    return 1;
-    ```
+        * Use the type system rather than sentinel/edge values. For example, in C#, do not use `DateTime.MinValue` to denote absence of a date, or `-1` to denote absence of a number, use a nullable type instead.
 
-    Improved code:
-    ```typescript
-    import { TypeHelpers } from "fp-sdk";
-
-    if (TypeHelpers.IsNullOrUndefined(foo))
-    {
-        return 0;
-    }
-    return 1;
-    ```
-
-    * Use Option types where available instead of nullable edge-values.
-
-    Example in F# (bad):
-    ```fsharp
-    let SomeFunction(): SomeObj =
-        if not (SomeInnerFunction())
-            null
-        else
-            SomeObj("init", 0)
-    ```
-
-    Improved code:
-    ```fsharp
-    let SomeFunction(): Option<SomeObj> =
-        if not (SomeInnerFunction())
-            None
-        else
-            Some <| SomeObj("init", 0)
-    ```
-
-    Example in TypeScript (bad):
-    ```typescript
-    function someFunction(): SomeObj | null | undefined {
-        if (!(someInnerFunction())) {
-            return null;
-        } else {
-            return new SomeObj("init", 0);
+        Example in C# (bad):
+        ```csharp
+        DateTime SomeFunction() {
+            if (!SomeInnerFunction()) {
+                return DateTime.MinValue;
+            } else {
+                return DateTime.Now;
+            }
         }
-    }
-    ```
+        ```
 
-    Improved code:
-    ```typescript
-    import { Option, Some, None } from "fp-sdk";
-
-    function someFunction(): Option<SomeObj> {
-        if (!(someInnerFunction())) {
-            return new None();
-        } else {
-            return new Some(new SomeObj("init", 0));
+        Improved code:
+        ```csharp
+        Nullable<DateTime> SomeFunction() {
+            if (!SomeInnerFunction()) {
+                return null;
+            } else {
+                return DateTime.Now;
+            }
         }
-    }
-    ```
+        ```
 
+        * If your language supports Option types (e.g. F#) natively or through libraries (e.g. TypeScript), then use these instead of nullable/nullish types.
+
+        Example in F# (bad):
+        ```fsharp
+        let SomeFunction(): SomeObj =
+            if not (SomeInnerFunction())
+                null
+            else
+                SomeObj("init", 0)
+        ```
+
+        Improved code:
+        ```fsharp
+        let SomeFunction(): Option<SomeObj> =
+            if not (SomeInnerFunction())
+                None
+            else
+                Some <| SomeObj("init", 0)
+        ```
+
+        Example in TypeScript (bad):
+        ```typescript
+        function someFunction(): SomeObj | null | undefined {
+            if (!(someInnerFunction())) {
+                return null;
+            } else {
+                return new SomeObj("init", 0);
+            }
+        }
+        ```
+
+        Improved code:
+        ```typescript
+        import { Option, Some, None } from "fp-sdk";
+
+        function someFunction(): Option<SomeObj> {
+            if (!(someInnerFunction())) {
+                return new None();
+            } else {
+                return new Some(new SomeObj("init", 0));
+            }
+        }
+        ```
+
+        * If the library you consume is not respecting our coding guidelines about nullish/option types, then protect yourself from it from the start when doing absence checks and do not hardcode nullish keywords.
+
+        For example, in F#, use `Option.ofObj()` and then use a match against the result of this function.
+
+        Example (bad):
+        ```fsharp
+        if SomeApiFromExternalLibrary.SomeSingletonStaticProperty = null then
+            failwith "some kind of error..."
+        UseExternalData(SomeApiFromExternalLibrary.SomeSingletonStaticProperty)
+        ```
+
+        Improved code (that avoids you having to type `null` but, most importantly, avoids a race condition):
+        ```fsharp
+        let someExternalData = Option.ofObj(SomeApiFromExternalLibrary.SomeSingletonStaticProperty)
+        match someExternalData with
+        | None ->
+            failwith "some kind of error..."
+        | Some data ->
+            UseExternalData(data)
+        ```
+
+        In TypeScript, the equivalent of F#'s `Option.ofObj()` exists in `fp-sdk`'s: `OptionHelpers.ofObj()`, but if you do not need to use the value and just check for absence, you can still avoid typing nullish keywords by using `TypeHelpers.isNullOrUndefined()`:
+
+        Example (bad):
+        ```typescript
+        if (foo === undefined || foo === null)
+        {
+            return 0;
+        }
+        return 1;
+        ```
+
+        Improved code:
+        ```typescript
+        import { TypeHelpers } from "fp-sdk";
+
+        if (TypeHelpers.IsNullOrUndefined(foo))
+        {
+            return 0;
+        }
+        return 1;
+        ```
 
     * Abusing obscure operators or the excessive multi-facetedness of basic ones:
 
@@ -457,15 +503,51 @@
 
         Example (bad):
         ```typescript
-        if (!zipFile)
+        if (!zipFile) {
             return;
+        }
         ```
 
         Improved code:
         ```typescript
-        if (zipFile === null)
+        if (zipFile === null) {
             return;
+        }
         ```
+
+        * Even if you're checking bool variables, still don't use `!` and be explicit about the comparison against true or false, otherwise if you're using a bad language that has truthiness issues (e.g. **falsy** elements), you might fall into a trap.
+
+        Example (bad) because developer thinks that the condition will only be met when value is `false`:
+        ```typescript
+        if (!value) {
+            ...
+        }
+        ```
+
+        Improved code (that prevents a `0` or empty string `""` to meet the condition):
+        ```typescript
+        if (value === false) {
+            ...
+        }
+        ```
+
+        * Even if you're not using `!` be explicit about the comparison against true or false, otherwise with TypeScript your condition will also be met with **truthy** values such as `1`.
+
+        Example (bad) because developer thinks that the condition will only be met when value is `false`:
+        ```typescript
+        if (value) {
+            ...
+        }
+        ```
+
+        Improved code:
+        ```typescript
+        if (value === true) {
+            ...
+        }
+        ```
+
+        NB: Please do this even if your language doesn't have these traps (e.g. F#), so that the code is more readable for people that are switching languages constantly.
 
         * Avoid recent terse C# operators like `??` and `??=` when they make the code less readable—explicit checks are clearer.
 
