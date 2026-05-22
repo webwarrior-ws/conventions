@@ -467,6 +467,40 @@
             return;
         ```
 
+        * Even if you're checking bool variables, still don't use `!` and be explicit about the comparison against true or false, otherwise if you're using a bad language that has truthiness issues (e.g. **falsy** elements), you might fall into a trap.
+
+        Example (bad) because developer thinks that the condition will only be met when value is `false`:
+        ```typescript
+        if (!value) {
+            ...
+        }
+        ```
+
+        Improved code (that prevents a `0` or empty string `""` to meet the condition):
+        ```typescript
+        if (value === false) {
+            ...
+        }
+        ```
+
+        * Even if you're not using `!` be explicit about the comparison against true or false, otherwise with typescript your condition will also be met with **truthy** values such as `1`.
+
+        Example (bad) because developer thinks that the condition will only be met when value is `false`:
+        ```typescript
+        if (value) {
+            ...
+        }
+        ```
+
+        Improved code:
+        ```typescript
+        if (value === true) {
+            ...
+        }
+        ```
+
+        NB: Please do this even if your language doesn't have these traps (e.g. F#), so that the code is more readable for people that are switching languages constantly.
+
         * Avoid recent terse C# operators like `??` and `??=` when they make the code less readable—explicit checks are clearer.
 
         Example (bad):
