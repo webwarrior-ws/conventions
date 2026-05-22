@@ -384,72 +384,118 @@
     }
     ```
 
-    * Not benefiting from your type system: we use statically-typed languages (such as TypeScript and C#) to let the compiler protect us. Use the type system rather than sentinel/edge values. For example, do not use `DateTime.MinValue` to denote absence—use a nullable or Option type. Do not use `undefined` in TypeScript; use explicit option/nullable patterns instead.
+    * Not benefiting from your type system: we use statically-typed languages (such as TypeScript and C#) to let the compiler protect us. See many examples of this below.
 
-    Example (bad):
-    ```typescript
-    if (foo === undefined || foo === null)
-    {
-        return 0;
-    }
-    return 1;
-    ```
+        * Use the type system rather than sentinel/edge values. For example, in C#, do not use `DateTime.MinValue` to denote absence of a date, or `-1` to denote absence of a number, use a nullable type instead.
 
-    Improved code:
-    ```typescript
-    import { TypeHelpers } from "fp-sdk";
-
-    if (TypeHelpers.IsNullOrUndefined(foo))
-    {
-        return 0;
-    }
-    return 1;
-    ```
-
-    * Use Option types where available instead of nullable edge-values.
-
-    Example in F# (bad):
-    ```fsharp
-    let SomeFunction(): SomeObj =
-        if not (SomeInnerFunction())
-            null
-        else
-            SomeObj("init", 0)
-    ```
-
-    Improved code:
-    ```fsharp
-    let SomeFunction(): Option<SomeObj> =
-        if not (SomeInnerFunction())
-            None
-        else
-            Some <| SomeObj("init", 0)
-    ```
-
-    Example in TypeScript (bad):
-    ```typescript
-    function someFunction(): SomeObj | null | undefined {
-        if (!(someInnerFunction())) {
-            return null;
-        } else {
-            return new SomeObj("init", 0);
+        Example in C# (bad):
+        ```csharp
+        DateTime SomeFunction() {
+            if (!SomeInnerFunction()) {
+                return DateTime.MinValue;
+            } else {
+                return DateTime.Now;
+            }
         }
-    }
-    ```
+        ```
 
-    Improved code:
-    ```typescript
-    import { Option, Some, None } from "fp-sdk";
-
-    function someFunction(): Option<SomeObj> {
-        if (!(someInnerFunction())) {
-            return new None();
-        } else {
-            return new Some(new SomeObj("init", 0));
+        Improved code:
+        ```csharp
+        Nullable<DateTime> SomeFunction() {
+            if (!SomeInnerFunction()) {
+                return null;
+            } else {
+                return DateTime.Now;
+            }
         }
-    }
-    ```
+        ```
 
+        * If your language supports Option types (e.g. F#) natively or through libraries (e.g. TypeScript), then use these instead of nullable/nullish types.
+
+        Example in F# (bad):
+        ```fsharp
+        let SomeFunction(): SomeObj =
+            if not (SomeInnerFunction())
+                null
+            else
+                SomeObj("init", 0)
+        ```
+
+        Improved code:
+        ```fsharp
+        let SomeFunction(): Option<SomeObj> =
+            if not (SomeInnerFunction())
+                None
+            else
+                Some <| SomeObj("init", 0)
+        ```
+
+        Example in TypeScript (bad):
+        ```typescript
+        function someFunction(): SomeObj | null | undefined {
+            if (!(someInnerFunction())) {
+                return null;
+            } else {
+                return new SomeObj("init", 0);
+            }
+        }
+        ```
+
+        Improved code:
+        ```typescript
+        import { Option, Some, None } from "fp-sdk";
+
+        function someFunction(): Option<SomeObj> {
+            if (!(someInnerFunction())) {
+                return new None();
+            } else {
+                return new Some(new SomeObj("init", 0));
+            }
+        }
+        ```
+
+        * If the library you consume is not respecting our coding guidelines about nullish/option types, then protect yourself from it from the start when doing absence checks and do not hardcode nullish keywords.
+
+        For example, in F#, use `Option.ofObj()` and then use a match against the result of this function.
+
+        Example (bad):
+        ```fsharp
+        if SomeApiFromExternalLibrary.SomeSingletonStaticProperty = null then
+            failwith "some kind of error..."
+        UseExternalData(SomeApiFromExternalLibrary.SomeSingletonStaticProperty)
+        ```
+
+        Improved code (that avoids you having to type `null` but, most importantly, avoids a race condition):
+        ```fsharp
+        let someExternalData = Option.ofObj(SomeApiFromExternalLibrary.SomeSingletonStaticProperty)
+        match someExternalData with
+        | None ->
+            failwith "some kind of error..."
+        | Some data ->
+            UseExternalData(data)
+        ```
+
+        In TypeScript, the equivalent of F#'s `Option.ofObj()` exists in `fp-sdk`'s: `OptionHelpers.ofObj()`, but if you do not need to use the value and just check for absence, you can still avoid typing nullish keywords by using `TypeHelpers.isNullOrUndefined()`:
+
+        Example (bad):
+        ```typescript
+        if (foo === undefined || foo === null)
+        {
+            return 0;
+        }
+        return 1;
+        ```
+
+        Improved code:
+        ```typescript
+        import { TypeHelpers } from "fp-sdk";
+
+        if (TypeHelpers.IsNullOrUndefined(foo))
+        {
+            return 0;
+        }
+        return 1;
+        ```
 
     * Abusing obscure operators or the excessive multi-facetedness of basic ones:
 
@@ -485,7 +531,7 @@
         }
         ```
 
-        * Even if you're not using `!` be explicit about the comparison against true or false, otherwise with typescript your condition will also be met with **truthy** values such as `1`.
+        * Even if you're not using `!` be explicit about the comparison against true or false, otherwise with TypeScript your condition will also be met with **truthy** values such as `1`.
 
         Example (bad) because developer thinks that the condition will only be met when value is `false`:
         ```typescript
