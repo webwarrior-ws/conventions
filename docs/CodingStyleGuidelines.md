@@ -457,14 +457,16 @@
 
         Example (bad):
         ```typescript
-        if (!zipFile)
+        if (!zipFile) {
             return;
+        }
         ```
 
         Improved code:
         ```typescript
-        if (zipFile === null)
+        if (zipFile === null) {
             return;
+        }
         ```
 
         * Even if you're checking bool variables, still don't use `!` and be explicit about the comparison against true or false, otherwise if you're using a bad language that has truthiness issues (e.g. **falsy** elements), you might fall into a trap.
