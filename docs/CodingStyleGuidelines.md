@@ -308,36 +308,36 @@
 
     * Empty catch‑all blocks: if you really can't use a specific exception in your catch block and the catch has to capture any kind of exception, DO NOT leave the catch block completely empty. At minimum, log the exception with its details. And if logging it truly doesn't make sense, include a comment explaining why logging is omitted, why a catch‑all is needed, and why it's safe to swallow the exception.
 
-        Example (bad):
-        ```csharp
-        try {
-            SomeOperation();
-        } catch (Exception) {
-        }
-        ```
+    Example (bad):
+    ```csharp
+    try {
+        SomeOperation();
+    } catch (Exception) {
+    }
+    ```
 
-        Improved code (preferred — log the exception):
-        ```csharp
-        try {
-            SomeOperation();
-        } catch (Exception ex) {
-            // This catch-all is intentional because the operation is non‑critical
-            Logger.Warn(ex, "Non‑critical operation failed; proceeding without aborting.");
-        }
-        ```
+    Improved code (preferred — log the exception):
+    ```csharp
+    try {
+        SomeOperation();
+    } catch (Exception ex) {
+        // This catch-all is intentional because the operation is non‑critical
+        Logger.Warn(ex, "Non‑critical operation failed; proceeding without aborting.");
+    }
+    ```
 
-        Improved code (when logging doesn't apply — explain why):
-        ```csharp
-        try {
-            SomeOperation();
-        } catch {
-            // Logging is not appropriate here because the exception may contain
-            // sensitive credential data that must not be written to logs.
-            // This catch-all is needed because the third‑party library does not
-            // document which exception types it throws, and the operation is
-            // safe to skip without side effects.
-        }
-        ```
+    Improved code (when logging doesn't apply — explain why):
+    ```csharp
+    try {
+        SomeOperation();
+    } catch {
+        // Logging is not appropriate here because the exception may contain
+        // sensitive credential data that must not be written to logs.
+        // This catch-all is needed because the third‑party library does not
+        // document which exception types it throws, and the operation is
+        // safe to skip without side effects.
+    }
+    ```
 
     * Catching preventable exceptions: some exceptions are avoidable and should be prevented by checks instead of being caught.
 
