@@ -11,9 +11,11 @@ permissions:
 
 jobs:
   pi-agent:
+    # HACK: GitHub Actions expressions don't support escape sequences like \n in string literals,
+    # so fromJSON('"\n"') is used to inject an actual newline character
     if: |
       contains(fromJson('["knocte", "webwarrior-ws"]'), github.actor) &&
-      startsWith(github.event.comment.body, '/pi ')
+      (startsWith(github.event.comment.body, '/pi ') || contains(github.event.comment.body, format('{0}/pi ', fromJSON('"\n"'))))
     runs-on: ubuntu-24.04
     steps:
       - name: Setup Node
