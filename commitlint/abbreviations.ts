@@ -6,6 +6,7 @@ export const abbr = {
     "added": "add",
     "address": "addr",
     "adjust": "tweak",
+    "after": "post",
     "algorithm": "algo",
     "algorithms": "algos",
     "allocate": "alloc",
