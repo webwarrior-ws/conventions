@@ -24,7 +24,8 @@ jobs:
           node-version: 22
 
       - name: Run Pi agent
-        uses: shaftoe/pi-coding-agent-action@develop
+        # v2.19.2 => Pi 0.78.0
+        uses: shaftoe/pi-coding-agent-action@000a481921fa525abf2ccbcdee0ae25cd3b92835
         with:
           github_token: ${{ secrets.GH_REPO_BOT_ACCESS_TOKEN }}
           provider: ppq
