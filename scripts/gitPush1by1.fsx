@@ -171,10 +171,6 @@ let GetLastCommits(count: UInt32) =
 
 let remotes = Git.GetRemotes()
 
-if not(remotes.Any()) then
-    Console.Error.WriteLine "No remotes found, please add one first."
-    Environment.Exit 5
-
 let args = Misc.FsxOnlyArguments()
 
 if args.Length > 3 then
@@ -231,6 +227,8 @@ let maybeRemote, maybeNumberOfCommits, force =
             let remote = Some(args.[0])
             remote, numberOfCommits, false
 
+let currentBranch = Git.GetCurrentBranch()
+
 let remote, remoteUrl =
     match maybeRemote with
     | Some remoteProvided ->
@@ -248,15 +246,35 @@ let remote, remoteUrl =
             failwith <| "Unreachable because of: " + errMsg
         | Some remote -> remote
     | None ->
-        if remotes.Count() > 1 then
+        match Seq.toList remotes with
+        | (onlyRemote, onlyRemoteUrl) :: [] ->
+            if onlyRemote <> "origin" && onlyRemote <> "upstream" then
+                onlyRemote, onlyRemoteUrl
+            else if currentBranch.StartsWith "wip" then
+                onlyRemote, onlyRemoteUrl
+            else
+                Console.Error.WriteLine(
+                    sprintf
+                        "You're creating a non-wip branch '%s' on a non-fork repo, please supply the remoteName to avoid pushing non-wip branches to the canonical upstream."
+                        currentBranch
+                )
+
+                Environment.Exit 7
+
+                failwith "Unreachable: non-wip branch on canonical remote"
+        | [] ->
+            Console.Error.WriteLine "No remotes found, please add one first."
+
+            Environment.Exit 5
+
+            failwith "Unreachable: no remotes"
+        | _ ->
             Console.Error.WriteLine
-                "Usage: gitpush.fsx <remoteName> [numberOfCommits(optional)]"
+                "Multiple remotes found, please supply remoteName as first argument."
 
             Environment.Exit 6
 
-        remotes.ElementAt 0
-
-let currentBranch = Git.GetCurrentBranch()
+            failwith "Unreachable: multiple remotes"
 
 let commitsToBePushed =
     match maybeNumberOfCommits with
