@@ -13,6 +13,38 @@ open System.Configuration
 open Fsdk
 open Fsdk.Process
 
+let errTooManyArgs =
+    (1,
+     $"Usage: dotnet fsi {__SOURCE_FILE__} [remoteName(optional)] [numberOfCommits(optional)]")
+
+let errSecondArgShouldBeIntHigherThanZero =
+    (2, "Second argument should be an integer higher than zero")
+
+let errSecondArgShouldBeInteger = (3, "Second argument should be an integer")
+
+let ErrRemoteNotFound remoteNameProvided =
+    (4, sprintf "Remote '%s' not found" remoteNameProvided)
+
+let ErrChooseRemoteNameToAvoidPushingNonWipBranchToCanonicalRemote
+    currentBranch
+    =
+    (5,
+     sprintf
+         "You're creating a non-wip branch '%s' on a non-fork repo, please supply the remoteName to avoid pushing non-wip branches to the canonical upstream."
+         currentBranch)
+
+let errNoRemotesFound = (6, "No remotes found, please add one first.")
+
+let errMultipleRemotesFoundPleaseSupplyRemoteNameParam =
+    (7, "Multiple remotes found, please supply remoteName as first argument.")
+
+let ErrCurrentBranchIsUpToDateSoMaybeForcePush currentBranch remote =
+    (8,
+     sprintf
+         "Current branch '%s' in remote '%s' is already up to date. Force push by specifying number of commits as 2nd argument?"
+         currentBranch
+         remote)
+
 // mimic https://stackoverflow.com/a/3230241/544947
 let GitSpecificPush
     (remoteName: string)
@@ -174,18 +206,17 @@ let remotes = Git.GetRemotes()
 let args = Misc.FsxOnlyArguments()
 
 if args.Length > 3 then
-    Console.Error.WriteLine
-        $"Usage: dotnet fsi {__SOURCE_FILE__} [remoteName(optional)] [numberOfCommits(optional)]"
-
-    Environment.Exit 1
+    let exitCode, errMsg = errTooManyArgs
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode
 
 let maybeRemote, maybeNumberOfCommits, force =
     if args.Length > 1 then
         match UInt32.TryParse args.[1] with
         | true, 0u ->
-            let errMsg = "Second argument should be an integer higher than zero"
+            let exitCode, errMsg = errSecondArgShouldBeIntHigherThanZero
             Console.Error.WriteLine errMsg
-            Environment.Exit 2
+            Environment.Exit exitCode
 
             failwith <| "Unreachable because of: " + errMsg
         | true, num ->
@@ -200,9 +231,9 @@ let maybeRemote, maybeNumberOfCommits, force =
 
             remote, numberOfCommits, force
         | _ ->
-            let errMsg = "Second argument should be an integer"
+            let exitCode, errMsg = errSecondArgShouldBeInteger
             Console.Error.WriteLine errMsg
-            Environment.Exit 3
+            Environment.Exit exitCode
 
             failwith <| "Unreachable because of: " + errMsg
     elif args.Length = 0 then
@@ -210,12 +241,9 @@ let maybeRemote, maybeNumberOfCommits, force =
     else // if args.Length = 1 then
         match UInt32.TryParse args.[0] with
         | true, 0u ->
-            let errMsg =
-                "Argument for the number of commits should be an integer higher than zero"
-
+            let exitCode, errMsg = errSecondArgShouldBeIntHigherThanZero
             Console.Error.WriteLine errMsg
-
-            Environment.Exit 2
+            Environment.Exit exitCode
 
             failwith <| "Unreachable because of: " + errMsg
         | true, num ->
@@ -238,11 +266,9 @@ let remote, remoteUrl =
                 remotes
             with
         | None ->
-            let errMsg = sprintf "Remote '%s' not found" remoteProvided
+            let exitCode, errMsg = ErrRemoteNotFound remoteProvided
             Console.Error.WriteLine errMsg
-
-            Environment.Exit 4
-
+            Environment.Exit exitCode
             failwith <| "Unreachable because of: " + errMsg
         | Some remote -> remote
     | None ->
@@ -253,28 +279,25 @@ let remote, remoteUrl =
             else if currentBranch.StartsWith "wip" then
                 onlyRemote, onlyRemoteUrl
             else
-                Console.Error.WriteLine(
-                    sprintf
-                        "You're creating a non-wip branch '%s' on a non-fork repo, please supply the remoteName to avoid pushing non-wip branches to the canonical upstream."
+                let exitCode, errMsg =
+                    ErrChooseRemoteNameToAvoidPushingNonWipBranchToCanonicalRemote
                         currentBranch
-                )
 
-                Environment.Exit 7
-
-                failwith "Unreachable: non-wip branch on canonical remote"
+                Console.Error.WriteLine errMsg
+                Environment.Exit exitCode
+                failwith <| "Unreachable because of: " + errMsg
         | [] ->
-            Console.Error.WriteLine "No remotes found, please add one first."
-
-            Environment.Exit 5
-
-            failwith "Unreachable: no remotes"
+            let exitCode, errMsg = errNoRemotesFound
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
         | _ ->
-            Console.Error.WriteLine
-                "Multiple remotes found, please supply remoteName as first argument."
+            let exitCode, errMsg =
+                errMultipleRemotesFoundPleaseSupplyRemoteNameParam
 
-            Environment.Exit 6
-
-            failwith "Unreachable: multiple remotes"
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
 
 let commitsToBePushed =
     match maybeNumberOfCommits with
@@ -282,16 +305,11 @@ let commitsToBePushed =
         let commitsToPush = FindUnpushedCommits remote currentBranch
 
         if commitsToPush.Length = 0 then
-            let errMsg =
-                sprintf
-                    "Current branch '%s' in remote '%s' is already up to date. Force push by specifying number of commits as 2nd argument?"
-                    currentBranch
-                    remote
+            let exitCode, errMsg =
+                ErrCurrentBranchIsUpToDateSoMaybeForcePush currentBranch remote
 
             Console.Error.WriteLine errMsg
-
-            Environment.Exit 5
-
+            Environment.Exit exitCode
             failwith <| "Unreachable because of: " + errMsg
         elif commitsToPush.Length = 1 then
             // no need to ask for confirmation since 1 commit doesn't need to be separated from other commits
