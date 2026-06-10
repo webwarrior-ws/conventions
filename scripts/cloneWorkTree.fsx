@@ -24,8 +24,21 @@ let featureBranchName = args.[1]
 
 // 1) Extract repo name from URL
 let repoName =
-    let uri = Uri repoUrl
-    let segments = uri.AbsolutePath.TrimEnd('/').Split('/')
+    let pathPart =
+        if repoUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase) then
+            // SCP-style SSH URL: git@host:path/to/repo.git
+            let colonIndex = repoUrl.IndexOf(':')
+
+            if colonIndex < 0 then
+                failwith "Invalid SCP-style git URL: missing ':' separator"
+
+            repoUrl.Substring(colonIndex + 1)
+        else
+            // Standard URI (https, ssh://, file://, etc.)
+            let uri = Uri repoUrl
+            uri.AbsolutePath
+
+    let segments = pathPart.TrimEnd('/').Split('/')
     let lastSegmentOpt = Array.tryLast segments
 
     match lastSegmentOpt with
