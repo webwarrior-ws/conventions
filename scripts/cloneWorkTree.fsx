@@ -15,12 +15,12 @@ let args = Misc.FsxOnlyArguments()
 
 if args.Length <> 2 then
     Console.Error.WriteLine
-        $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl> <featureBranchName>"
+        $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl> <branchName>"
 
     Environment.Exit 1
 
 let repoUrl = args.[0]
-let featureBranchName = args.[1]
+let branchName = args.[1]
 
 // 1) Extract repo name from URL
 let repoName =
@@ -49,6 +49,22 @@ let repoName =
         else
             lastSegment
 
+let branchExists =
+    let output =
+        Process
+            .Execute(
+                {
+                    Command = "git"
+                    Arguments =
+                        sprintf "ls-remote --heads %s %s" repoUrl branchName
+                },
+                Echo.Off
+            )
+            .UnwrapDefault()
+            .Trim()
+
+    output.Contains branchName
+
 // 2) Create subfolder with same name as repo (fail if already exists)
 if Directory.Exists repoName then
     Console.Error.WriteLine(sprintf "Directory '%s' already exists." repoName)
@@ -59,11 +75,21 @@ Directory.CreateDirectory repoName |> ignore<DirectoryInfo>
 // 3) cd into that folder
 Directory.SetCurrentDirectory repoName
 
+let cloneSpecificSingleBranch =
+    if branchExists then
+        sprintf "--branch %s" branchName
+    else
+        String.Empty
+
 // 4) git clone --single-branch --bare <repository-url> .bare
 let gitClone =
     {
         Command = "git"
-        Arguments = sprintf "clone --single-branch --bare %s .bare" repoUrl
+        Arguments =
+            sprintf
+                "clone --single-branch %s --bare -- %s .bare"
+                cloneSpecificSingleBranch
+                repoUrl
     }
 
 let cloneProc = Process.Execute(gitClone, Echo.All)
@@ -88,19 +114,20 @@ let gitSymbolicRef =
         Arguments = "symbolic-ref HEAD --short"
     }
 
-let defaultBranch =
-    Process
-        .Execute(gitSymbolicRef, Echo.Off)
-        .UnwrapDefault()
-        .Trim()
+let baseBranch =
+    if branchExists then
+        branchName
+    else
+        Process
+            .Execute(gitSymbolicRef, Echo.Off)
+            .UnwrapDefault()
+            .Trim()
 
-Console.WriteLine(sprintf "Default branch: %s" defaultBranch)
-
-// 7) git worktree add <defaultBranch> <featureBranchName>
+// 7) git worktree add <defaultBranch> <branchName>
 let gitWorktreeAdd =
     {
         Command = "git"
-        Arguments = sprintf "worktree add %s %s" featureBranchName defaultBranch
+        Arguments = sprintf "worktree add %s %s" branchName baseBranch
     }
 
 let worktreeProc = Process.Execute(gitWorktreeAdd, Echo.All)
@@ -112,53 +139,35 @@ match worktreeProc.Result with
 | WarningsOrAmbiguous _
 | Success _ -> ()
 
-// 8) cd into featureBranchName and create branch
-Directory.SetCurrentDirectory featureBranchName
+// 8) cd into branchName and create branch
+Directory.SetCurrentDirectory branchName
 
-let branchExists =
-    let output =
-        Process
-            .Execute(
-                {
-                    Command = "git"
-                    Arguments = sprintf "branch --list %s" featureBranchName
-                },
-                Echo.Off
-            )
-            .UnwrapDefault()
-            .Trim()
+if not branchExists then
+    let checkoutArgs = sprintf "checkout -b %s" branchName
 
-    output.Contains featureBranchName
+    let gitCheckout =
+        {
+            Command = "git"
+            Arguments = checkoutArgs
+        }
 
-let checkoutArgs =
-    if branchExists then
-        sprintf "switch %s" featureBranchName
-    else
-        sprintf "checkout -b %s" featureBranchName
+    let checkoutProc = Process.Execute(gitCheckout, Echo.All)
 
-let gitCheckout =
-    {
-        Command = "git"
-        Arguments = checkoutArgs
-    }
+    match checkoutProc.Result with
+    | Error _ ->
+        if branchExists then
+            Console.Error.WriteLine("Git switch failed.")
+        else
+            Console.Error.WriteLine("Git checkout -b failed.")
 
-let checkoutProc = Process.Execute(gitCheckout, Echo.All)
-
-match checkoutProc.Result with
-| Error _ ->
-    if branchExists then
-        Console.Error.WriteLine("Git switch failed.")
-    else
-        Console.Error.WriteLine("Git checkout -b failed.")
-
-    Environment.Exit 5
-| WarningsOrAmbiguous _
-| Success _ -> ()
+        Environment.Exit 5
+    | WarningsOrAmbiguous _
+    | Success _ -> ()
 
 Console.WriteLine(
     sprintf
         "Successfully created worktree '%s' from branch '%s' of repo '%s'"
-        defaultBranch
-        featureBranchName
+        baseBranch
+        branchName
         repoName
 )
