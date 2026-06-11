@@ -1,7 +1,7 @@
 #!/usr/bin/env -S dotnet fsi
 
-open System.IO
 open System
+open System.IO
 
 #r "nuget: Mono.Unix, Version=7.1.0-final.1.21458.1"
 #r "nuget: YamlDotNet, Version=16.1.3"

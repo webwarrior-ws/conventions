@@ -1,5 +1,6 @@
 #!/usr/bin/env -S dotnet fsi
 
+open System
 open System.IO
 
 #r "System.Core.dll"
@@ -47,12 +48,12 @@ let packagesWithMultipleVersions =
 if not packagesWithMultipleVersions.IsEmpty then
     for KeyValue(packageName, versions) in packagesWithMultipleVersions do
         let versionsString =
-            System.String.Join(
+            String.Join(
                 ", ",
                 versions |> Seq.map(fun version -> $"\"{version}\"")
             )
 
-        System.Console.Error.WriteLine
+        Console.Error.WriteLine
             $"Found {versions.Count} different versions of package \"{packageName}\": {versionsString}"
 
-    System.Environment.Exit 1
+    Environment.Exit 1
