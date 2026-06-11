@@ -15,52 +15,104 @@ let args = Misc.FsxOnlyArguments()
 
 if args.Length <> 2 then
     Console.Error.WriteLine
-        $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl> <branchName>"
+        $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl|folderPath> <branchName>"
 
     Environment.Exit 1
 
-let repoUrl = args.[0]
+let firstArg = args.[0]
 let branchName = args.[1]
 
 // Sanitize branch name for use as a folder name by replacing slashes/backslashes with dashes
 let branchFolderName = branchName.Replace('/', '-').Replace('\\', '-')
 
-// 1) Extract repo name from URL
-let repoName =
-    let pathPart =
-        if repoUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase) then
-            // SCP-style SSH URL: git@host:path/to/repo.git
-            let colonIndex = repoUrl.IndexOf(':')
+let IsUrl(str: string) : bool =
+    str.Contains("://")
+    || str.StartsWith("git@", StringComparison.OrdinalIgnoreCase)
 
-            if colonIndex < 0 then
-                failwith "Invalid SCP-style git URL: missing ':' separator"
+let isUrl = IsUrl firstArg
 
-            repoUrl.Substring(colonIndex + 1)
-        else
-            // Standard URI (https, ssh://, file://, etc.)
-            let uri = Uri repoUrl
-            uri.AbsolutePath
+// 1) Extract repo name from URL, or validate folder path
+let repoUrl, repoName, isExistingClone =
+    if isUrl then
+        let url = firstArg
 
-    let segments = pathPart.TrimEnd('/').Split('/')
-    let lastSegmentOpt = Array.tryLast segments
+        let name =
+            let pathPart =
+                if url.StartsWith("git@", StringComparison.OrdinalIgnoreCase) then
+                    // SCP-style SSH URL: git@host:path/to/repo.git
+                    let colonIndex = url.IndexOf(':')
 
-    match lastSegmentOpt with
-    | None -> failwith "Unreachable"
-    | Some lastSegment ->
-        if lastSegment.EndsWith(".git", StringComparison.OrdinalIgnoreCase) then
-            lastSegment.Substring(0, lastSegment.Length - ".git".Length)
-        else
-            lastSegment
+                    if colonIndex < 0 then
+                        failwith
+                            "Invalid SCP-style git URL: missing ':' separator"
+
+                    url.Substring(colonIndex + 1)
+                else
+                    // Standard URI (https, ssh://, file://, etc.)
+                    let uri = Uri url
+                    uri.AbsolutePath
+
+            let segments = pathPart.TrimEnd('/').Split('/')
+            let lastSegmentOpt = Array.tryLast segments
+
+            match lastSegmentOpt with
+            | None -> failwith "Unreachable"
+            | Some lastSegment ->
+                if
+                    lastSegment.EndsWith
+                        (
+                            ".git",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                then
+                    lastSegment.Substring(0, lastSegment.Length - ".git".Length)
+                else
+                    lastSegment
+
+        let existing =
+            Directory.Exists name
+            && File.Exists(Path.Combine(name, ".git"))
+            && Directory.Exists(Path.Combine(name, ".bare"))
+
+        url, name, existing
+    else
+        let fullPath = Path.GetFullPath firstArg
+
+        if not(Directory.Exists fullPath) then
+            Console.Error.WriteLine(
+                sprintf "Directory '%s' does not exist." firstArg
+            )
+
+            Environment.Exit 2
+
+        let gitFile = Path.Combine(fullPath, ".git")
+        let bareDir = Path.Combine(fullPath, ".bare")
+
+        if not(File.Exists gitFile) || not(Directory.Exists bareDir) then
+            Console.Error.WriteLine(
+                sprintf
+                    "Directory '%s' already exists and is not a clone."
+                    firstArg
+            )
+
+            Environment.Exit 2
+
+        let name = Path.GetFileName(Path.TrimEndingDirectorySeparator fullPath)
+
+        String.Empty, name, true
 
 let ghOwner =
-    let pathPart =
-        if repoUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase) then
-            let colonIndex = repoUrl.IndexOf ':'
-            repoUrl.Substring(colonIndex + 1)
-        else
-            (Uri repoUrl).AbsolutePath.TrimStart '/'
+    if isUrl then
+        let pathPart =
+            if repoUrl.StartsWith("git@", StringComparison.OrdinalIgnoreCase) then
+                let colonIndex = repoUrl.IndexOf ':'
+                repoUrl.Substring(colonIndex + 1)
+            else
+                (Uri repoUrl).AbsolutePath.TrimStart '/'
 
-    pathPart.TrimEnd('/').Split('/').[0]
+        pathPart.TrimEnd('/').Split('/').[0]
+    else
+        String.Empty
 
 let CheckIsGitHubFork (owner: string) (repo: string) : Option<bool> =
     use httpClient = new System.Net.Http.HttpClient()
@@ -80,136 +132,155 @@ let CheckIsGitHubFork (owner: string) (repo: string) : Option<bool> =
     with
     | _ -> None
 
-let branchExists =
-    let output =
-        Process
-            .Execute(
-                {
-                    Command = "git"
-                    Arguments =
-                        sprintf "ls-remote --heads %s %s" repoUrl branchName
-                },
-                Echo.Off
-            )
-            .UnwrapDefault()
-            .Trim()
+// Check branch existence on remote only when a URL was given
+let remoteBranchExists =
+    if not isUrl then
+        false
+    else
+        let output =
+            Process
+                .Execute(
+                    {
+                        Command = "git"
+                        Arguments =
+                            sprintf "ls-remote --heads %s %s" repoUrl branchName
+                    },
+                    Echo.Off
+                )
+                .UnwrapDefault()
+                .Trim()
 
-    output.Contains branchName
+        output.Contains branchName
 
 // 2) Handle directory creation or validate existing clone
-let isExistingClone =
-    if Directory.Exists repoName then
-        let gitFile = Path.Combine(repoName, ".git")
-        let bareDir = Path.Combine(repoName, ".bare")
-
-        if not(File.Exists gitFile) || not(Directory.Exists bareDir) then
-            Console.Error.WriteLine(
-                sprintf
-                    "Directory '%s' already exists and is not a clone."
-                    repoName
-            )
-
-            Environment.Exit 2
-
-        true
-    else
-        false
-
 if not isExistingClone then
     Directory.CreateDirectory repoName |> ignore<DirectoryInfo>
 
 // 3) cd into that folder
-Directory.SetCurrentDirectory repoName
+let targetDir =
+    if isUrl then
+        repoName
+    else
+        firstArg
 
-if isExistingClone then
-    // Check if repoUrl is already a remote
-    let remoteOutput =
-        Process
-            .Execute(
+Directory.SetCurrentDirectory targetDir
+
+// Determine branch existence after entering the directory
+let branchExists =
+    if isUrl then
+        remoteBranchExists
+    else
+        let localCheck =
+            Process.Execute(
                 {
                     Command = "git"
-                    Arguments = "remote --verbose"
+                    Arguments =
+                        sprintf
+                            "rev-parse --verify --quiet refs/heads/%s"
+                            branchName
                 },
                 Echo.Off
             )
-            .UnwrapDefault()
 
-    let remoteAlreadyExists =
-        Misc.CrossPlatformStringSplitInLines remoteOutput
-        |> Seq.exists(fun line -> line.Contains repoUrl)
+        match localCheck.Result with
+        | Error _ -> false
+        | WarningsOrAmbiguous _
+        | Success _ -> true
 
-    if not remoteAlreadyExists then
-        let existingRemotes =
+if isExistingClone then
+    if isUrl then
+        // Check if repoUrl is already a remote
+        let remoteOutput =
+            Process
+                .Execute(
+                    {
+                        Command = "git"
+                        Arguments = "remote --verbose"
+                    },
+                    Echo.Off
+                )
+                .UnwrapDefault()
+
+        let remoteAlreadyExists =
             Misc.CrossPlatformStringSplitInLines remoteOutput
-            |> Seq.choose(fun line ->
-                let trimmed = line.Trim()
+            |> Seq.exists(fun line -> line.Contains repoUrl)
 
-                if String.IsNullOrEmpty trimmed then
-                    None
-                else
-                    let parts =
-                        trimmed.Split(
-                            [| ' '; '\t' |],
-                            StringSplitOptions.RemoveEmptyEntries
-                        )
+        if not remoteAlreadyExists then
+            let existingRemotes =
+                Misc.CrossPlatformStringSplitInLines remoteOutput
+                |> Seq.choose(fun line ->
+                    let trimmed = line.Trim()
 
-                    if parts.Length > 0 then
-                        Some parts.[0]
-                    else
+                    if String.IsNullOrEmpty trimmed then
                         None
-            )
-            |> Seq.distinct
-            |> Seq.toList
-
-        let isGitHubUrl =
-            repoUrl.Contains("github.com", StringComparison.OrdinalIgnoreCase)
-
-        let remoteName =
-            if not isGitHubUrl then
-                failwithf
-                    "Directory '%s' already exists; URL is not GitHub so API cannot be queried to find best name for new remote"
-                    repoName
-            else
-                match CheckIsGitHubFork ghOwner repoName with
-                | Some false ->
-                    if not(List.contains "upstream" existingRemotes) then
-                        "upstream"
-                    elif not(List.contains "origin" existingRemotes) then
-                        "origin"
                     else
+                        let parts =
+                            trimmed.Split(
+                                [| ' '; '\t' |],
+                                StringSplitOptions.RemoveEmptyEntries
+                            )
+
+                        if parts.Length > 0 then
+                            Some parts.[0]
+                        else
+                            None
+                )
+                |> Seq.distinct
+                |> Seq.toList
+
+            let isGitHubUrl =
+                repoUrl.Contains(
+                    "github.com",
+                    StringComparison.OrdinalIgnoreCase
+                )
+
+            let remoteName =
+                if not isGitHubUrl then
+                    failwithf
+                        "Directory '%s' already exists; URL is not GitHub so API cannot be queried to find best name for new remote"
+                        repoName
+                else
+                    match CheckIsGitHubFork ghOwner repoName with
+                    | Some false ->
+                        if not(List.contains "upstream" existingRemotes) then
+                            "upstream"
+                        elif not(List.contains "origin" existingRemotes) then
+                            "origin"
+                        else
+                            Console.Error.WriteLine(
+                                "Both 'upstream' and 'origin' remotes already exist and the new remote is not a fork. Cannot determine a name for the new remote."
+                            )
+
+                            Environment.Exit 3
+                            String.Empty
+                    | Some true -> sprintf "%sFork" ghOwner
+                    | None ->
                         Console.Error.WriteLine(
-                            "Both 'upstream' and 'origin' remotes already exist and the new remote is not a fork. Cannot determine a name for the new remote."
+                            "Could not check whether the repo is a GitHub fork. Cannot determine a name for the new remote."
                         )
 
                         Environment.Exit 3
                         String.Empty
-                | Some true -> sprintf "%sFork" ghOwner
-                | None ->
-                    Console.Error.WriteLine(
-                        "Could not check whether the repo is a GitHub fork. Cannot determine a name for the new remote."
-                    )
 
-                    Environment.Exit 3
-                    String.Empty
+            let addRemoteProc =
+                Process.Execute(
+                    {
+                        Command = "git"
+                        Arguments =
+                            sprintf "remote add %s %s" remoteName repoUrl
+                    },
+                    Echo.All
+                )
 
-        let addRemoteProc =
-            Process.Execute(
-                {
-                    Command = "git"
-                    Arguments = sprintf "remote add %s %s" remoteName repoUrl
-                },
-                Echo.All
-            )
+            match addRemoteProc.Result with
+            | Error _ ->
+                Console.Error.WriteLine(
+                    sprintf "Failed to add remote '%s'." repoUrl
+                )
 
-        match addRemoteProc.Result with
-        | Error _ ->
-            Console.Error.WriteLine(
-                sprintf "Failed to add remote '%s'." repoUrl
-            )
-
-            Environment.Exit 3
-        | WarningsOrAmbiguous _
-        | Success _ -> ()
+                Environment.Exit 3
+            | WarningsOrAmbiguous _
+            | Success _ -> ()
 
     // Fetch all remotes
     let fetchProc =
