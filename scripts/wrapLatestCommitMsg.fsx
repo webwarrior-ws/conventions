@@ -1,9 +1,9 @@
 #!/usr/bin/env -S dotnet fsi
 
-open System.IO
 open System
-open System.Text.RegularExpressions
+open System.IO
 open System.Linq
+open System.Text.RegularExpressions
 
 #r "nuget: Mono.Unix, Version=7.1.0-final.1.21458.1"
 #r "nuget: YamlDotNet, Version=16.1.3"
