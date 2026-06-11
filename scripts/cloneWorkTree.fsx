@@ -11,13 +11,50 @@ open System.Configuration
 open Fsdk
 open Fsdk.Process
 
+let errUsage =
+    (1, $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl|folderPath> <branchName>")
+
+let ErrDirectoryDoesNotExist path =
+    (2, sprintf "Directory '%s' does not exist." path)
+
+let ErrDirectoryIsNotClone path =
+    (3, sprintf "Directory '%s' already exists and is not a clone." path)
+
+let errCannotDetermineRemoteName =
+    (4,
+     "Both 'upstream' and 'origin' remotes already exist and the new remote is not a fork. Cannot determine a name for the new remote.")
+
+let errCannotCheckGitHubFork =
+    (5,
+     "Could not check whether the repo is a GitHub fork. Cannot determine a name for the new remote.")
+
+let ErrFailedToAddRemote url =
+    (6, sprintf "Failed to add remote '%s'." url)
+
+let errGitFetchAllFailed = (7, "Git fetch --all failed.")
+
+let errGitCloneFailed = (8, "Git clone failed.")
+
+let ErrNotGitHubCannotDetermineRemoteName dir =
+    (9,
+     sprintf
+         "Directory '%s' already exists; URL is not GitHub so API cannot be queried to find best name for new remote"
+         dir)
+
+let errGitWorktreeAddFailed = (10, "Git worktree add failed.")
+
+let errGitCheckoutFailed = (11, "Git checkout -b failed.")
+
+let ErrFailedToRenameRemote newName =
+    (12, sprintf "Failed to rename remote 'origin' to '%s'." newName)
+
 let args = Misc.FsxOnlyArguments()
 
 if args.Length <> 2 then
-    Console.Error.WriteLine
-        $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl|folderPath> <branchName>"
+    let exitCode, errMsg = errUsage
+    Console.Error.WriteLine errMsg
 
-    Environment.Exit 1
+    Environment.Exit exitCode
 
 let firstArg = args.[0]
 let branchName = args.[1]
@@ -79,23 +116,19 @@ let repoUrl, repoName, isExistingClone =
         let fullPath = Path.GetFullPath firstArg
 
         if not(Directory.Exists fullPath) then
-            Console.Error.WriteLine(
-                sprintf "Directory '%s' does not exist." firstArg
-            )
+            let exitCode, errMsg = ErrDirectoryDoesNotExist firstArg
+            Console.Error.WriteLine errMsg
 
-            Environment.Exit 2
+            Environment.Exit exitCode
 
         let gitFile = Path.Combine(fullPath, ".git")
         let bareDir = Path.Combine(fullPath, ".bare")
 
         if not(File.Exists gitFile) || not(Directory.Exists bareDir) then
-            Console.Error.WriteLine(
-                sprintf
-                    "Directory '%s' already exists and is not a clone."
-                    firstArg
-            )
+            let exitCode, errMsg = ErrDirectoryIsNotClone firstArg
+            Console.Error.WriteLine errMsg
 
-            Environment.Exit 2
+            Environment.Exit exitCode
 
         let name = Path.GetFileName(Path.TrimEndingDirectorySeparator fullPath)
 
@@ -236,9 +269,12 @@ if isExistingClone then
 
             let remoteName =
                 if not isGitHubUrl then
-                    failwithf
-                        "Directory '%s' already exists; URL is not GitHub so API cannot be queried to find best name for new remote"
-                        repoName
+                    let exitCode, errMsg =
+                        ErrNotGitHubCannotDetermineRemoteName repoName
+
+                    Console.Error.WriteLine errMsg
+                    Environment.Exit exitCode
+                    failwith <| "Unreachable because of: " + errMsg
                 else
                     match CheckIsGitHubFork ghOwner repoName with
                     | Some false ->
@@ -247,20 +283,18 @@ if isExistingClone then
                         elif not(List.contains "origin" existingRemotes) then
                             "origin"
                         else
-                            Console.Error.WriteLine(
-                                "Both 'upstream' and 'origin' remotes already exist and the new remote is not a fork. Cannot determine a name for the new remote."
-                            )
+                            let exitCode, errMsg = errCannotDetermineRemoteName
+                            Console.Error.WriteLine errMsg
 
-                            Environment.Exit 3
-                            String.Empty
+                            Environment.Exit exitCode
+                            failwith <| "Unreachable because of: " + errMsg
                     | Some true -> sprintf "%sFork" ghOwner
                     | None ->
-                        Console.Error.WriteLine(
-                            "Could not check whether the repo is a GitHub fork. Cannot determine a name for the new remote."
-                        )
+                        let exitCode, errMsg = errCannotCheckGitHubFork
+                        Console.Error.WriteLine errMsg
 
-                        Environment.Exit 3
-                        String.Empty
+                        Environment.Exit exitCode
+                        failwith <| "Unreachable because of: " + errMsg
 
             let addRemoteProc =
                 Process.Execute(
@@ -274,11 +308,10 @@ if isExistingClone then
 
             match addRemoteProc.Result with
             | Error _ ->
-                Console.Error.WriteLine(
-                    sprintf "Failed to add remote '%s'." repoUrl
-                )
+                let exitCode, errMsg = ErrFailedToAddRemote repoUrl
+                Console.Error.WriteLine errMsg
 
-                Environment.Exit 3
+                Environment.Exit exitCode
             | WarningsOrAmbiguous _
             | Success _ -> ()
 
@@ -294,8 +327,9 @@ if isExistingClone then
 
     match fetchProc.Result with
     | Error _ ->
-        Console.Error.WriteLine "Git fetch --all failed."
-        Environment.Exit 3
+        let exitCode, errMsg = errGitFetchAllFailed
+        Console.Error.WriteLine errMsg
+        Environment.Exit exitCode
     | WarningsOrAmbiguous _
     | Success _ -> ()
 else
@@ -323,8 +357,9 @@ else
         // Clean up the directory we created
         Directory.SetCurrentDirectory("..")
         Directory.Delete(repoName, true)
-        Console.Error.WriteLine "Git clone failed."
-        Environment.Exit 3
+        let exitCode, errMsg = errGitCloneFailed
+        Console.Error.WriteLine errMsg
+        Environment.Exit exitCode
     | WarningsOrAmbiguous _
     | Success _ -> ()
 
@@ -358,8 +393,9 @@ let worktreeProc = Process.Execute(gitWorktreeAdd, Echo.All)
 
 match worktreeProc.Result with
 | Error _ ->
-    Console.Error.WriteLine "Git worktree add failed."
-    Environment.Exit 4
+    let exitCode, errMsg = errGitWorktreeAddFailed
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode
 | WarningsOrAmbiguous _
 | Success _ -> ()
 
@@ -379,12 +415,9 @@ if not branchExists then
 
     match checkoutProc.Result with
     | Error _ ->
-        if branchExists then
-            Console.Error.WriteLine("Git switch failed.")
-        else
-            Console.Error.WriteLine("Git checkout -b failed.")
-
-        Environment.Exit 5
+        let exitCode, errMsg = errGitCheckoutFailed
+        Console.Error.WriteLine errMsg
+        Environment.Exit exitCode
     | WarningsOrAmbiguous _
     | Success _ -> ()
 
@@ -422,12 +455,9 @@ if not isExistingClone then
 
                 match renameProc.Result with
                 | Error _ ->
-                    Console.Error.WriteLine(
-                        sprintf
-                            "Failed to rename remote 'origin' to '%s'."
-                            newRemoteName
-                    )
+                    let exitCode, errMsg = ErrFailedToRenameRemote newRemoteName
 
-                    Environment.Exit 6
+                    Console.Error.WriteLine errMsg
+                    Environment.Exit exitCode
                 | WarningsOrAmbiguous _
                 | Success _ -> ()
