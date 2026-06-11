@@ -14,25 +14,30 @@ open Fsdk
 open Fsdk.Process
 open Fsdk.FSharpUtil
 
+let errNotGitHubCI =
+    (1, "This script is meant to be used only within a GitHubCI pipeline.")
+
+let errNoGitHubToken =
+    (2,
+     """Please set the GITHUB_TOKEN environment variable in your GitHubCI pipeline:
+
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+""")
+
 let githubRepository = Environment.GetEnvironmentVariable "GITHUB_REPOSITORY"
 
 if String.IsNullOrEmpty githubRepository then
-    Console.Error.WriteLine
-        "This script is meant to be used only within a GitHubCI pipeline."
-
-    Environment.Exit 1
+    let exitCode, errMsg = errNotGitHubCI
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode
 
 let githubToken = Environment.GetEnvironmentVariable "GITHUB_TOKEN"
 
 if String.IsNullOrEmpty githubToken then
-    Console.Error.WriteLine
-        "Please set the GITHUB_TOKEN environment variable in your GitHubCI pipeline:
-
-    env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    "
-
-    Environment.Exit 2
+    let exitCode, errMsg = errNoGitHubToken
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode
 
 let GetPreviousCommitsHashes() =
     Fsdk

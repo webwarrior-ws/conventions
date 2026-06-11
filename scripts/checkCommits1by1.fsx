@@ -17,6 +17,35 @@ open Fsdk
 open Fsdk.Process
 open Fsdk.FSharpUtil
 
+let errNotGitHubCI =
+    (1, "This script is meant to be used only within a GitHubCI pipeline")
+
+let errNoAccessToken =
+    (2,
+     """Please define GITHUB_TOKEN environment variable in your GitHubCI workflow:
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+""")
+
+let errNoGitHubActions =
+    (3,
+     """
+Please activate GitHub Actions in your repository. Click on the
+"Actions" tab at the top of the repository page and click on the
+"I understand my workflows, go ahead and enable them" button.
+""")
+
+let errNotPushedOneByOne =
+    (4,
+     "Please push the commits one by one to make sure every commit has a CI status; using this script is recommended:"
+     + Environment.NewLine
+     + "https://github.com/nblockchain/conventions/blob/master/scripts/gitPush1by1.fsx")
+
+let errCiNotSuccessful =
+    (5,
+     "CI is not successful (green) for one or more commits, or it passes when a failing test is expected.")
+
 type GithubEventType =
     JsonProvider<"""
 {
@@ -1152,19 +1181,9 @@ type CheckSuitesType =
 let githubEventPath = Environment.GetEnvironmentVariable "GITHUB_EVENT_PATH"
 
 if String.IsNullOrEmpty githubEventPath then
-    Console.Error.WriteLine
-        "This script is meant to be used only within a GitHubCI pipeline"
-
-    Environment.Exit 2
-
-let githubTokenErrorMsg =
-    """Please define GITHUB_TOKEN environment variable in your GitHubCI workflow:
-
-```
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-"""
+    let exitCode, errMsg = errNotGitHubCI
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode
 
 let accessTokenName, accessToken =
     let personalAccessToken = Environment.GetEnvironmentVariable "ACCESS_TOKEN"
@@ -1177,8 +1196,10 @@ let accessTokenName, accessToken =
         if not(String.IsNullOrEmpty githubToken) then
             "GITHUB_TOKEN", (Environment.GetEnvironmentVariable "GITHUB_TOKEN")
         else
-            Console.Error.WriteLine githubTokenErrorMsg
-            exit 1
+            let exitCode, errMsg = errNoAccessToken
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
 
 printfn "Using access token %s" accessTokenName
 Console.WriteLine()
@@ -1319,16 +1340,10 @@ let ciStatuses =
 let gitHubActionsEnabled = ciStatuses.Any(fun (hasCiStatus, _) -> hasCiStatus)
 
 if not gitHubActionsEnabled then
-    let errMsg =
-        sprintf
-            """
-Please activate GitHub Actions in your repository. Click on the
-"Actions" tab at the top of the repository page and click on the
-"I understand my workflows, go ahead and enable them" button.
-"""
-
+    let exitCode, errMsg = errNoGitHubActions
     Console.Error.WriteLine errMsg
-    Environment.Exit 1
+    Environment.Exit exitCode
+    failwith <| "Unreachable because of: " + errMsg
 
 let notUsedGitPush1by1 =
     gitHubActionsEnabled
@@ -1337,15 +1352,11 @@ let notUsedGitPush1by1 =
     )
 
 if notUsedGitPush1by1 then
-    let errMsg =
-        sprintf
-            "Please push the commits one by one to make sure every commit has a CI status; using this script is recommended:%s%s"
-            Environment.NewLine
-            "https://github.com/nblockchain/conventions/blob/master/scripts/gitPush1by1.fsx"
-
+    let exitCode, errMsg = errNotPushedOneByOne
     Console.WriteLine()
     Console.Error.WriteLine errMsg
-    Environment.Exit 2
+    Environment.Exit exitCode
+    failwith <| "Unreachable because of: " + errMsg
 
 let expectedFailureSubstrings = [ "failing test"; "failing CI" ]
 
@@ -1411,5 +1422,8 @@ See commit '{commitHash}' for the first occurrence of this issue."""
             Console.Error.WriteLine
                 $"Hint: if you want to state that a commit can have red CI because of adding a failing test, please make sure that the commit message contains the {expectedFailureSubstringsJoined} term"
 
-            Environment.Exit 3
+            let exitCode, errMsg = errCiNotSuccessful
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
 )

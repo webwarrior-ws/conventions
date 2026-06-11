@@ -9,24 +9,31 @@ open System.Configuration
 #r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
 open Fsdk
 
-let args = Misc.FsxOnlyArguments()
-
 let errTooManyArgs =
-    "Can only pass two arguments, with optional flag: replace.fsx --file=a.b oldstring newstring"
+    (1,
+     "Can only pass two arguments, with optional flag: replace.fsx --file=a.b oldstring newstring")
+
+let errTooFewArgs =
+    (2, "Need to pass two arguments: replace.fsx oldstring newstring")
+
+let ErrFileNotFound path =
+    (3, sprintf "File '%s' doesn't exist" path)
 
 let note =
     "NOTE: by default, some kind of files/folders will be excluded, e.g.: .git, *.dll, *.png, ..."
 
-if args.Length > 3 then
-    Console.Error.WriteLine errTooManyArgs
-    Console.WriteLine note
-    Environment.Exit 1
-elif args.Length < 2 then
-    Console.Error.WriteLine
-        "Need to pass two arguments: replace.fsx oldstring newstring"
+let args = Misc.FsxOnlyArguments()
 
+if args.Length > 3 then
+    let exitCode, errMsg = errTooManyArgs
+    Console.Error.WriteLine errMsg
     Console.WriteLine note
-    Environment.Exit 1
+    Environment.Exit exitCode
+elif args.Length < 2 then
+    let exitCode, errMsg = errTooFewArgs
+    Console.Error.WriteLine errMsg
+    Console.WriteLine note
+    Environment.Exit exitCode
 
 let firstArg = args.[0]
 
@@ -35,15 +42,19 @@ let particularFile =
         let file = firstArg.Substring(firstArg.IndexOf("=") + 1) |> FileInfo
 
         if not file.Exists then
-            failwithf "File '%s' doesn't exist" file.FullName
+            let exitCode, errMsg = ErrFileNotFound file.FullName
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
 
         Some file
     else
         if args.Length = 3 then
-            Console.Error.WriteLine errTooManyArgs
+            let exitCode, errMsg = errTooManyArgs
+            Console.Error.WriteLine errMsg
             Console.WriteLine note
-            Environment.Exit 1
-            failwith "Unreachable"
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
 
         None
 

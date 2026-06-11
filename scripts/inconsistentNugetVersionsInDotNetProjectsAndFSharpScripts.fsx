@@ -16,6 +16,10 @@ open System.IO
 #load "../src/FileConventions/NugetVersionsCheck.fs"
 #load "../src/FileConventions/CombinedVersionCheck.fs"
 
+let errInconsistentVersions =
+    (1,
+     "Inconsistent NuGet package versions detected between F# scripts and .NET projects")
+
 let currentDir = Directory.GetCurrentDirectory()
 
 let targetDirs =
@@ -56,4 +60,6 @@ if not packagesWithMultipleVersions.IsEmpty then
         Console.Error.WriteLine
             $"Found {versions.Count} different versions of package \"{packageName}\": {versionsString}"
 
-    Environment.Exit 1
+    let exitCode, errMsg = errInconsistentVersions
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode

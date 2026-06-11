@@ -17,15 +17,28 @@ open Fsdk
 
 open NugetVersionsCheck
 
+let errUsage =
+    (1, sprintf "Usage: dotnet fsi %s [example.sln(optional)]" __SOURCE_FILE__)
+
+let ErrDirectoryNotAllowed arg =
+    (2, sprintf "Use an .sln file instead of directory: '%s'" arg)
+
+let ErrFileNotFound arg =
+    (3, sprintf "'%s' does not exist." arg)
+
+let ErrInvalidArgument arg =
+    (4,
+     sprintf
+         "'%s' argument is invalid. You should enter an .sln file or run this script on current directory"
+         arg)
+
 let args = Misc.FsxOnlyArguments()
 let currentDirectory = Directory.GetCurrentDirectory()
 
 if args.Length > 1 then
-    Console.Error.WriteLine(
-        sprintf "Usage: dotnet fsi %s [example.sln(optional)]" __SOURCE_FILE__
-    )
-
-    Environment.Exit 1
+    let exitCode, errMsg = errUsage
+    Console.Error.WriteLine errMsg
+    Environment.Exit exitCode
 
 let target =
     if args.IsEmpty then
@@ -34,15 +47,22 @@ let target =
         let singleArg = args.[0]
 
         if Directory.Exists singleArg then
-            failwithf "Use an .sln file insted of directory."
+            let exitCode, errMsg = ErrDirectoryNotAllowed singleArg
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
         elif not(File.Exists singleArg) then
-            failwithf "'%s' does not exist." singleArg
+            let exitCode, errMsg = ErrFileNotFound singleArg
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
         elif singleArg.EndsWith ".sln" then
             singleArg |> FileInfo |> ScriptTarget.Solution
         else
-            failwithf
-                "'%s' argument is invalid. You should enter an .sln file or run this script on current directory"
-                singleArg
+            let exitCode, errMsg = ErrInvalidArgument singleArg
+            Console.Error.WriteLine errMsg
+            Environment.Exit exitCode
+            failwith <| "Unreachable because of: " + errMsg
 
 
 let nugetSolutionPackagesDir =
