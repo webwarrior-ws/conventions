@@ -22,6 +22,9 @@ if args.Length <> 2 then
 let repoUrl = args.[0]
 let branchName = args.[1]
 
+// Sanitize branch name for use as a folder name by replacing slashes/backslashes with dashes
+let branchFolderName = branchName.Replace('/', '-').Replace('\\', '-')
+
 // 1) Extract repo name from URL
 let repoName =
     let pathPart =
@@ -277,7 +280,7 @@ let baseBranch =
 let gitWorktreeAdd =
     {
         Command = "git"
-        Arguments = sprintf "worktree add %s %s" branchName baseBranch
+        Arguments = sprintf "worktree add %s %s" branchFolderName baseBranch
     }
 
 let worktreeProc = Process.Execute(gitWorktreeAdd, Echo.All)
@@ -290,7 +293,7 @@ match worktreeProc.Result with
 | Success _ -> ()
 
 // 8) cd into branchName and create branch
-Directory.SetCurrentDirectory branchName
+Directory.SetCurrentDirectory branchFolderName
 
 if not branchExists then
     let checkoutArgs = sprintf "checkout -b %s" branchName
