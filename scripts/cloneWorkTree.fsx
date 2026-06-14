@@ -533,7 +533,77 @@ match fetchProc.Result with
 
 let gitWorktreeAddArgs =
     if branchTargetInfo.ExistsAlready then
-        sprintf "%s %s" branchTargetInfo.SubFolderName branchTargetInfo.Name
+        // Use remote tracking ref to avoid ambiguity when multiple remotes have the same branch
+        let allRemoteNames =
+            AllRemotes initialState |> Map.toSeq |> Seq.map fst |> Seq.toList
+
+        let remotesWithBranch =
+            allRemoteNames
+            |> List.filter(fun remoteName ->
+                CheckRemoteBranchExists branchTargetInfo.Name remoteName
+            )
+
+        // Prefer: input-URL remote > upstream/origin > non-fork remotes
+        // TODO: improve this heuristic — consider checking which branch has more commits,
+        // or which branch's latest commit is more recent
+        let preferredRemote =
+            match remotesWithBranch with
+            | [] -> None // fallback
+            | singleRemote :: [] -> Some singleRemote
+            | _multipleRemotes ->
+                // Determine which remote corresponds to the input URL (if first arg was a URL)
+                let inputUrlRemote =
+                    match initialState with
+                    | {
+                          ArgType = Url(fullUrl, _, _)
+                      } ->
+                        AllRemotes initialState
+                        |> Map.tryPick(fun name url ->
+                            if url.Contains fullUrl then
+                                Some name
+                            else
+                                None
+                        )
+                    | _ -> None
+
+                let fromInputUrl =
+                    inputUrlRemote
+                    |> Option.bind(fun urlRemote ->
+                        remotesWithBranch
+                        |> List.tryFind(fun name -> name = urlRemote)
+                    )
+
+                fromInputUrl
+                |> Option.orElseWith(fun () ->
+                    remotesWithBranch
+                    |> List.tryFind(fun name -> name = "upstream")
+                )
+                |> Option.orElseWith(fun () ->
+                    remotesWithBranch
+                    |> List.tryFind(fun name -> name = "origin")
+                )
+                |> Option.orElseWith(fun () ->
+                    remotesWithBranch
+                    |> List.tryFind(fun name ->
+                        not(
+                            name.EndsWith(
+                                "Fork",
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
+                    )
+                )
+                |> Option.orElse(List.tryHead remotesWithBranch)
+
+        match preferredRemote with
+        | Some remote ->
+            sprintf
+                "%s %s/%s"
+                branchTargetInfo.SubFolderName
+                remote
+                branchTargetInfo.Name
+        | None ->
+            sprintf "%s %s" branchTargetInfo.SubFolderName branchTargetInfo.Name
     else
         sprintf "-b %s %s" branchTargetInfo.Name branchTargetInfo.SubFolderName
 
