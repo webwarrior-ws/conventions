@@ -543,7 +543,8 @@ let allowedNonVerboseFlags =
     seq {
         "unzip"
 
-        // git
+        "git -C"
+        // more from git:
         "checkout -b"
         "worktree add -b"
 

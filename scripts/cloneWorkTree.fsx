@@ -624,35 +624,20 @@ match worktreeProc.Result with
 | Success _ -> ()
 
 // If branch already existed, worktree was created from a remote tracking ref
-// and is in detached HEAD state; create a local branch (unless it already exists,
-// e.g. from a bare clone)
+// and is in detached HEAD state; create or reset the local branch to HEAD
+// (which is the latest remote tracking ref), then switch to it
 if branchTargetInfo.ExistsAlready then
-    let branchAlreadyExists =
-        Process
-            .Execute(
-                {
-                    Command = "git"
-                    Arguments = sprintf "branch --list %s" branchTargetInfo.Name
-                },
-                Echo.Off
-            )
-            .UnwrapDefault()
-            .Trim()
-            .Length > 0
+    let fullCmd =
+        sprintf
+            "git -C %s checkout -B %s"
+            branchTargetInfo.SubFolderName
+            branchTargetInfo.Name
 
     let checkoutProc =
         Process.Execute(
             {
-                Command = "git"
-                Arguments =
-                    sprintf
-                        "-C %s checkout %s%s"
-                        branchTargetInfo.SubFolderName
-                        (if branchAlreadyExists then
-                             ""
-                         else
-                             "-b ")
-                        branchTargetInfo.Name
+                Command = fullCmd.Split(' ').First()
+                Arguments = fullCmd.Substring("git ".Length)
             },
             Echo.All
         )
