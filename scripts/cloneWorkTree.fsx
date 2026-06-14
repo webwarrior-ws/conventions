@@ -623,7 +623,30 @@ match worktreeProc.Result with
 | WarningsOrAmbiguous _
 | Success _ -> ()
 
+// If branch already existed, worktree was created from a remote tracking ref
+// and is in detached HEAD state; create a local branch
 if branchTargetInfo.ExistsAlready then
+    let checkoutProc =
+        Process.Execute(
+            {
+                Command = "git"
+                Arguments =
+                    sprintf
+                        "-C %s checkout -b %s"
+                        branchTargetInfo.SubFolderName
+                        branchTargetInfo.Name
+            },
+            Echo.All
+        )
+
+    match checkoutProc.Result with
+    | Error _ ->
+        let exitCode, errMsg = errGitCheckoutFailed
+        Console.Error.WriteLine errMsg
+        Environment.Exit exitCode
+    | WarningsOrAmbiguous _
+    | Success _ -> ()
+
     Console.WriteLine(
         sprintf
             "Successfully created worktree '%s' from branch '%s' of repo '%s'"
