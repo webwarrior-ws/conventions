@@ -1,7 +1,7 @@
 #!/usr/bin/env -S dotnet fsi
 
 open System
-open System.IO
+// open System.IO -- REMOVED; use AbsDir/AbsFile everywhere
 open System.Linq
 open System.Net.Http
 open System.Text.RegularExpressions
@@ -18,8 +18,92 @@ open Fsdk.Process
 
 open FSharp.Data
 
+type AbsFile(fileInfo: System.IO.FileInfo, ?checkExistence: bool) =
+    let shouldCheck = defaultArg checkExistence true
 
-let initialDir = Directory.GetCurrentDirectory()
+    do
+        if not(System.IO.Path.IsPathRooted fileInfo.FullName) then
+            failwithf
+                "AbsFile: path must be absolute, not relative: %s"
+                fileInfo.FullName
+
+        if shouldCheck && not fileInfo.Exists then
+            raise <| System.IO.FileNotFoundException fileInfo.FullName
+
+    member self.PathlessNameWithoutExtension =
+        System.IO.Path.GetFileNameWithoutExtension fileInfo.Name
+
+    member self.PathlessNameWithExtension = fileInfo.Name
+
+    member self.FullPath =
+        let path = fileInfo.FullName
+
+        if path.Contains(" ") then
+            "\"" + path + "\""
+        else
+            path
+
+    member self.Exists = fileInfo.Exists
+
+    member self.WriteAllText(contents: string) =
+        System.IO.File.WriteAllText(fileInfo.FullName, contents)
+
+    new(path: string, ?checkExistence: bool) =
+        if not(System.IO.Path.IsPathRooted path) then
+            failwithf "AbsFile secondary ctor received a relative path: %s" path
+
+        AbsFile(System.IO.FileInfo(path), ?checkExistence = checkExistence)
+
+type AbsDir(dirInfo: System.IO.DirectoryInfo, ?checkExistence: bool) =
+    let shouldCheck = defaultArg checkExistence true
+
+    do
+        if not(System.IO.Path.IsPathRooted dirInfo.FullName) then
+            failwithf
+                "AbsDir: path must be absolute, not relative: %s"
+                dirInfo.FullName
+
+        if shouldCheck && not dirInfo.Exists then
+            raise <| System.IO.DirectoryNotFoundException dirInfo.FullName
+
+    member self.PathlessName = dirInfo.Name
+
+    member self.FullPath =
+        let path = dirInfo.FullName
+
+        if path.Contains(" ") then
+            "\"" + path + "\""
+        else
+            path
+
+    member self.Exists = dirInfo.Exists
+
+    member self.Create() =
+        dirInfo.Create()
+
+    member self.Delete(recursive: bool) =
+        dirInfo.Delete(recursive)
+
+    member self.CombineDir(subPath: string, ?checkExistence: bool) =
+        System.IO.Path.Combine(dirInfo.FullName, subPath)
+        |> System.IO.DirectoryInfo
+        |> fun dirInfo -> AbsDir(dirInfo, ?checkExistence = checkExistence)
+
+    member self.CombineFile(subPath: string, ?checkExistence: bool) =
+        System.IO.Path.Combine(dirInfo.FullName, subPath)
+        |> System.IO.FileInfo
+        |> fun fileInfo -> AbsFile(fileInfo, ?checkExistence = checkExistence)
+
+    new(path: string, ?checkExistence: bool) =
+        if not(System.IO.Path.IsPathRooted path) then
+            failwithf "AbsDir secondary ctor received a relative path: %s" path
+
+        AbsDir(System.IO.DirectoryInfo(path), ?checkExistence = checkExistence)
+
+let initialDir = System.IO.Directory.GetCurrentDirectory() |> AbsDir
+
+let gitPointerFileName = ".git"
+let bareRepoDirName = ".bare"
 
 let errUsage =
     (1,
@@ -237,11 +321,15 @@ let ResolvePrUrl(prUrl: string) : string * string =
 
 
 // Determine branch existence via ls-remote against a single remote target (name or URL)
-let CheckRemoteBranchExists branchName remote =
+let CheckRemoteBranchExists (cloneDir: AbsDir) branchName remote =
     let output =
         Process
             .ExecDefault(
-                sprintf "git ls-remote --heads %s %s" remote branchName,
+                sprintf
+                    "git -C %s ls-remote --heads %s %s"
+                    cloneDir.FullPath
+                    remote
+                    branchName,
                 echo = Echo.Off
             )
             .UnwrapDefault()
@@ -249,52 +337,57 @@ let CheckRemoteBranchExists branchName remote =
 
     output.Contains branchName
 
-let AllRemotes initialState =
-    match initialState with
-    | {
-          ArgType = Url _
-          AlreadyCloned = false
-          RepoAndFolderName = repoName
-      } when (not(Directory.Exists(Path.Combine(initialDir, repoName)))) ->
+let AllRemotes(cloneDir: AbsDir) =
+    if not cloneDir.Exists then
         failwithf
-            "BUG: can't check remotes if repo is not cloned yet to %s"
-            (Path.Combine(initialDir, repoName))
-    | _ ->
-        let remoteOutput =
-            Process
-                .ExecDefault("git remote --verbose", echo = Echo.Off)
-                .UnwrapDefault()
+            "BUG: can't check remotes if repo directory doesn't exist: %s"
+            cloneDir.FullPath
 
-        Misc.CrossPlatformStringSplitInLines remoteOutput
-        |> Seq.map(fun line -> line.Trim())
-        |> Seq.filter(fun trimmed -> not(String.IsNullOrEmpty trimmed))
-        |> Seq.choose(fun trimmed ->
-            let parts =
-                trimmed.Split(
-                    [| ' '; '\t' |],
-                    StringSplitOptions.RemoveEmptyEntries
-                )
+    let remoteOutput =
+        Process
+            .ExecDefault(
+                sprintf "git -C %s remote --verbose" cloneDir.FullPath,
+                echo = Echo.Off
+            )
+            .UnwrapDefault()
 
-            if parts.Length >= 2 then
-                Some(parts.[0], parts.[1])
-            else
-                None
-        )
-        |> Seq.distinctBy fst
-        |> Map.ofSeq
+    Misc.CrossPlatformStringSplitInLines remoteOutput
+    |> Seq.map(fun line -> line.Trim())
+    |> Seq.filter(fun trimmed -> not(String.IsNullOrEmpty trimmed))
+    |> Seq.choose(fun trimmed ->
+        let parts =
+            trimmed.Split(
+                [| ' '; '\t' |],
+                StringSplitOptions.RemoveEmptyEntries
+            )
 
-let GetCurrentHeadBranch(repoDir: Option<string>) =
-    let maybeExtraFlag =
-        match repoDir with
-        | Some dir -> sprintf "-C %s" dir
-        | None -> String.Empty
+        if parts.Length >= 2 then
+            Some(parts.[0], parts.[1])
+        else
+            None
+    )
+    |> Seq.distinctBy fst
+    |> Map.ofSeq
 
-    let cmd = sprintf "git %s symbolic-ref --short HEAD" maybeExtraFlag
-
+let GetCurrentHeadBranch(cloneDir: AbsDir) =
     Process
-        .ExecDefault(cmd, echo = Echo.Off)
+        .ExecDefault(
+            sprintf "git -C %s symbolic-ref --short HEAD" cloneDir.FullPath,
+            echo = Echo.Off
+        )
         .UnwrapDefault(throwWhenWarnings = false)
         .Trim()
+
+let ValidateDirIsClone(cloneDir: AbsDir) =
+    let gitFile =
+        cloneDir.CombineFile(gitPointerFileName, checkExistence = false)
+
+    let bareDir = cloneDir.CombineDir(bareRepoDirName, checkExistence = false)
+
+    if not gitFile.Exists || not bareDir.Exists then
+        let exitCode, errMsg = ErrDirectoryIsNotClone cloneDir.PathlessName
+        Console.Error.WriteLine errMsg
+        Environment.Exit exitCode
 
 let rawArgs = Misc.FsxOnlyArguments()
 
@@ -342,24 +435,16 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
             let owner, repoAndFolderName =
                 ExtractGhOwnerAndRepoNameFromUrl firstArg
 
-            let existing = Directory.Exists repoAndFolderName
+            let cloneDir =
+                initialDir.CombineDir(repoAndFolderName, checkExistence = false)
+
+            let existing = cloneDir.Exists
 
             if existing then
-                if (not(File.Exists(Path.Combine(repoAndFolderName, ".git"))))
-                   || (not(
-                       Directory.Exists(
-                           Path.Combine(repoAndFolderName, ".bare")
-                       )
-                   )) then
-                    let exitCode, errMsg =
-                        ErrDirectoryIsNotClone repoAndFolderName
-
-                    Console.Error.WriteLine errMsg
-                    Environment.Exit exitCode
+                ValidateDirIsClone cloneDir
 
             if not existing then
-                Directory.CreateDirectory repoAndFolderName
-                |> ignore<DirectoryInfo>
+                cloneDir.Create()
 
             let headBranch =
                 // the split game below is meant to extract "master" from this example output:
@@ -386,24 +471,18 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
             repoAndFolderName,
             headBranch
         else
-            let fullPath = Path.GetFullPath firstArg
+            let cloneDir =
+                initialDir.CombineDir(firstArg, checkExistence = false)
 
-            if not(Directory.Exists fullPath) then
+            if not cloneDir.Exists then
                 let exitCode, errMsg = ErrDirectoryDoesNotExist firstArg
                 Console.Error.WriteLine errMsg
 
                 Environment.Exit exitCode
 
-            let gitFile = Path.Combine(fullPath, ".git")
-            let bareDir = Path.Combine(fullPath, ".bare")
+            ValidateDirIsClone cloneDir
 
-            if not(File.Exists gitFile) || not(Directory.Exists bareDir) then
-                let exitCode, errMsg = ErrDirectoryIsNotClone firstArg
-                Console.Error.WriteLine errMsg
-
-                Environment.Exit exitCode
-
-            true, FolderName, firstArg, GetCurrentHeadBranch(Some fullPath)
+            true, FolderName, firstArg, GetCurrentHeadBranch cloneDir
 
     let branchName =
         match maybeBranchName with
@@ -420,25 +499,25 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
             AlreadyCloned = alreadyCloned
         }
 
-    Directory.SetCurrentDirectory initialState.RepoAndFolderName
+    let cloneDir = initialDir.CombineDir(repoAndFolderName)
 
     let branchExists =
         let existsOnConfiguredRemotes() =
-            AllRemotes initialState
+            AllRemotes cloneDir
             |> Map.toSeq
             |> Seq.map fst
-            |> Seq.exists(CheckRemoteBranchExists branchName)
+            |> Seq.exists(CheckRemoteBranchExists cloneDir branchName)
 
         match initialState with
         | {
               ArgType = Url(fullUrl, _owner, _headBranch)
               AlreadyCloned = false
-          } -> CheckRemoteBranchExists branchName fullUrl
+          } -> CheckRemoteBranchExists cloneDir branchName fullUrl
         | {
               ArgType = Url(fullUrl, _owner, _headBranch)
               AlreadyCloned = true
           } ->
-            CheckRemoteBranchExists branchName fullUrl
+            CheckRemoteBranchExists cloneDir branchName fullUrl
             || existsOnConfiguredRemotes()
         | {
               ArgType = FolderName
@@ -458,6 +537,8 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
 
     initialState, branchTargetInfo
 
+let cloneDir = initialDir.CombineDir(initialState.RepoAndFolderName)
+
 match initialState with
 | {
       ArgType = Url(fullUrl, owner, _headBranch)
@@ -467,21 +548,29 @@ match initialState with
     try
         Process
             .ExecDefault(
-                sprintf "git clone --single-branch --bare %s .bare" fullUrl
+                sprintf
+                    "git -C %s clone --single-branch --bare %s %s"
+                    cloneDir.FullPath
+                    fullUrl
+                    bareRepoDirName
             )
             .UnwrapDefault(throwWhenWarnings = false)
         |> ignore<string>
     with
     | _ ->
         // Clean up the directory we created
-        Directory.SetCurrentDirectory initialDir
-        Directory.Delete(repoAndFolderName, true)
+        cloneDir.Delete(true)
         let exitCode, errMsg = errGitCloneFailed
         Console.Error.WriteLine errMsg
         Environment.Exit exitCode
 
     // Create .git file pointing to ./.bare (using F# instead of echo)
-    File.WriteAllText(".git", "gitdir: ./.bare" + Environment.NewLine)
+    let gitFile =
+        cloneDir.CombineFile(gitPointerFileName, checkExistence = false)
+
+    gitFile.WriteAllText(
+        sprintf "gitdir: ./%s" bareRepoDirName + Environment.NewLine
+    )
 
     let isGitHubUrl =
         fullUrl.Contains("github.com", StringComparison.OrdinalIgnoreCase)
@@ -499,7 +588,10 @@ match initialState with
 
                 Process
                     .ExecDefault(
-                        sprintf "git remote rename origin %s" newRemoteName
+                        sprintf
+                            "git -C %s remote rename origin %s"
+                            cloneDir.FullPath
+                            newRemoteName
                     )
                     .UnwrapDefault(throwWhenWarnings = false)
                 |> ignore<string>
@@ -510,7 +602,7 @@ match initialState with
       RepoAndFolderName = repoAndFolderName
   } ->
     let maybeFoundRemote =
-        AllRemotes initialState
+        AllRemotes cloneDir
         |> Map.tryPick(fun name url ->
             if url.Contains fullUrl then
                 Some name
@@ -533,7 +625,7 @@ match initialState with
                 Environment.Exit exitCode
                 failwith <| "Unreachable because of: " + errMsg
             else
-                let remoteMap = AllRemotes initialState
+                let remoteMap = AllRemotes cloneDir
 
                 match CheckIsGitHubFork owner repoAndFolderName with
                 | Some false ->
@@ -559,7 +651,11 @@ match initialState with
         try
             Process
                 .ExecDefault(
-                    sprintf "git remote add %s %s" newRemoteName fullUrl
+                    sprintf
+                        "git -C %s remote add %s %s"
+                        cloneDir.FullPath
+                        newRemoteName
+                        fullUrl
                 )
                 .UnwrapDefault(throwWhenWarnings = false)
             |> ignore<string>
@@ -581,20 +677,21 @@ if branchTargetInfo.ExistsAlready then
                   AlreadyCloned = _
                   RepoAndFolderName = _
               } -> headBranch
-            | _ -> GetCurrentHeadBranch None
+            | _ -> GetCurrentHeadBranch cloneDir
 
         [ headBranch; branchTargetInfo.Name ]
 
     let allRemoteNames =
-        AllRemotes initialState |> Map.toSeq |> Seq.map fst |> Seq.toList
+        AllRemotes cloneDir |> Map.toSeq |> Seq.map fst |> Seq.toList
 
     allRemoteNames
     |> Seq.iter(fun remoteName ->
         for branchToFetch in branchesToFetch do
-            if CheckRemoteBranchExists branchToFetch remoteName then
+            if CheckRemoteBranchExists cloneDir branchToFetch remoteName then
                 let setBranchesCmd =
                     sprintf
-                        "git remote set-branches --add %s %s"
+                        "git -C %s remote set-branches --add %s %s"
+                        cloneDir.FullPath
                         remoteName
                         branchToFetch
 
@@ -606,20 +703,26 @@ if branchTargetInfo.ExistsAlready then
 
 // Fetch all remotes
 Process
-    .ExecDefault("git fetch --all")
+    .ExecDefault(sprintf "git -C %s fetch --all" cloneDir.FullPath)
     .UnwrapDefault(throwWhenWarnings = false)
 |> ignore<string>
+
+let absWorktreeDir =
+    cloneDir.CombineDir(branchTargetInfo.SubFolderName, checkExistence = false)
 
 let gitWorktreeAddArgs =
     if branchTargetInfo.ExistsAlready then
         // Use remote tracking ref to avoid ambiguity when multiple remotes have the same branch
         let allRemoteNames =
-            AllRemotes initialState |> Map.toSeq |> Seq.map fst |> Seq.toList
+            AllRemotes cloneDir |> Map.toSeq |> Seq.map fst |> Seq.toList
 
         let remotesWithBranch =
             allRemoteNames
             |> List.filter(fun remoteName ->
-                CheckRemoteBranchExists branchTargetInfo.Name remoteName
+                CheckRemoteBranchExists
+                    cloneDir
+                    branchTargetInfo.Name
+                    remoteName
             )
 
         // Prefer: input-URL remote > upstream/origin > non-fork remotes
@@ -636,7 +739,7 @@ let gitWorktreeAddArgs =
                     | {
                           ArgType = Url(fullUrl, _, _)
                       } ->
-                        AllRemotes initialState
+                        AllRemotes cloneDir
                         |> Map.tryPick(fun name url ->
                             if url.Contains fullUrl then
                                 Some name
@@ -678,16 +781,17 @@ let gitWorktreeAddArgs =
         | Some remote ->
             sprintf
                 "%s %s/%s"
-                branchTargetInfo.SubFolderName
+                absWorktreeDir.FullPath
                 remote
                 branchTargetInfo.Name
-        | None ->
-            sprintf "%s %s" branchTargetInfo.SubFolderName branchTargetInfo.Name
+        | None -> sprintf "%s %s" absWorktreeDir.FullPath branchTargetInfo.Name
     else
-        sprintf "-b %s %s" branchTargetInfo.Name branchTargetInfo.SubFolderName
+        sprintf "-b %s %s" branchTargetInfo.Name absWorktreeDir.FullPath
 
 Process
-    .ExecDefault(sprintf "git worktree add %s" gitWorktreeAddArgs)
+    .ExecDefault(
+        sprintf "git -C %s worktree add %s" cloneDir.FullPath gitWorktreeAddArgs
+    )
     .UnwrapDefault(throwWhenWarnings = false)
 |> ignore<string>
 
@@ -695,10 +799,12 @@ Process
 // and is in detached HEAD state; create or reset the local branch to HEAD
 // (which is the latest remote tracking ref), then switch to it
 if branchTargetInfo.ExistsAlready then
+    let worktreeDir = cloneDir.CombineDir(branchTargetInfo.SubFolderName)
+
     let fullCmd =
         sprintf
             "git -C %s checkout -B %s"
-            branchTargetInfo.SubFolderName
+            worktreeDir.FullPath
             branchTargetInfo.Name
 
     Process
