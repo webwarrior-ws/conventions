@@ -10,21 +10,14 @@ open System.Text.RegularExpressions
 
 #load "../src/FileConventions/Library.fs"
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 
 open Fsdk
 open Fsdk.Process
 
 let commitMsg =
-    Fsdk
-        .Process
-        .Execute(
-            {
-                Command = "git"
-                Arguments = "log -1 --format=%B"
-            },
-            Echo.Off
-        )
+    Process
+        .ExecDefault("git log -1 --format=%B", echo = Echo.Off)
         .UnwrapDefault()
         .Trim()
 
@@ -56,15 +49,10 @@ let newCommitMsg =
         header + Environment.NewLine + Environment.NewLine + wrappedBody
     | _ -> header
 
-Fsdk
-    .Process
-    .Execute(
-        {
-            Command = "git"
-            Arguments =
-                $"commit --amend --message \"{EscapeDoubleQuotes newCommitMsg}\""
-        },
-        Echo.OutputOnly
+Process
+    .ExecDefault(
+        $"git commit --amend --message \"{EscapeDoubleQuotes newCommitMsg}\"",
+        echo = Echo.OutputOnly
     )
     .UnwrapDefault()
     .Trim()

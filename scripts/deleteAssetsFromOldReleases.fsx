@@ -8,7 +8,7 @@ open System.Net.Http.Headers
 #r "nuget: FSharp.Data, Version=5.0.2"
 open FSharp.Data
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 
 open Fsdk
 open Fsdk.Process
@@ -41,15 +41,8 @@ if String.IsNullOrEmpty githubToken then
 let numberOfLatestReleasesToKeep = 2
 
 let gitTags =
-    Fsdk
-        .Process
-        .Execute(
-            {
-                Command = "git"
-                Arguments = "tag --sort=creatordate"
-            },
-            Echo.Off
-        )
+    Process
+        .ExecDefault("git tag --sort=creatordate", echo = Echo.Off)
         .UnwrapDefault()
         .Trim()
         .Split(Environment.NewLine)

@@ -8,7 +8,7 @@ open System.Threading
 #r "System.Configuration"
 open System.Configuration
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 
 open Fsdk
 open Fsdk.Process
@@ -65,24 +65,21 @@ let GitSpecificPush
         else
             "--force-with-lease"
 
-    let gitPush =
-        {
-            Command = "git"
-            Arguments =
+    try
+        Process
+            .ExecDefault(
                 sprintf
-                    "push %s %s:refs/heads/%s %s"
+                    "git push %s %s:refs/heads/%s %s"
                     remoteName
                     commitSha
                     remoteBranchName
-                    forceFlag
-        }
-
-    let pushProc = Process.Execute(gitPush, Echo.OutputOnly)
-
-    match pushProc.Result with
-    | Error _ -> failwith "Push failed ^"
-    | WarningsOrAmbiguous _
-    | Success _ -> ()
+                    forceFlag,
+                echo = Echo.OutputOnly
+            )
+            .UnwrapDefault(throwWhenWarnings = false)
+        |> ignore<string>
+    with
+    | _ -> failwith "Push failed ^"
 
 let GitFetch(remoteOpt: Option<string>) =
     let remoteArg =
@@ -90,36 +87,33 @@ let GitFetch(remoteOpt: Option<string>) =
         | None -> "--all"
         | Some remote -> remote
 
-    let gitFetch =
-        {
-            Command = "git"
-            Arguments = sprintf "fetch %s" remoteArg
-        }
-
-    let fetchProc = Process.Execute(gitFetch, Echo.OutputOnly)
-
-    match fetchProc.Result with
-    | Error _ -> failwith "Fetch failed ^"
-    | WarningsOrAmbiguous _
-    | Success _ -> ()
+    try
+        Process
+            .ExecDefault(
+                sprintf "git fetch %s" remoteArg,
+                echo = Echo.OutputOnly
+            )
+            .UnwrapDefault(throwWhenWarnings = false)
+        |> ignore<string>
+    with
+    | _ -> failwith "Fetch failed ^"
 
 let GetLastNthCommitFromRemoteBranch
     (remoteName: string)
     (remoteBranch: string)
     (commitNumber: uint32)
     =
-    let gitShow =
-        {
-            Command = "git"
-            Arguments =
+    let gitShowProcOutput =
+        Process
+            .ExecDefault(
                 sprintf
-                    "show %s/%s~%i --no-patch"
+                    "git show %s/%s~%i --no-patch"
                     remoteName
                     remoteBranch
-                    commitNumber
-        }
-
-    let gitShowProcOutput = Process.Execute(gitShow, Echo.Off).UnwrapDefault()
+                    commitNumber,
+                echo = Echo.Off
+            )
+            .UnwrapDefault()
 
     let firstLine =
         (Misc.CrossPlatformStringSplitInLines gitShowProcOutput)
@@ -148,15 +142,11 @@ let FindUnpushedCommits (remoteName: string) (remoteBranch: string) =
 
         let currentHash =
             Process
-                .Execute(
-                    {
-                        Command = "git"
-                        Arguments =
-                            sprintf
-                                "log -1 --skip=%i --format=format:%%H"
-                                currentSkipCount
-                    },
-                    Echo.Off
+                .ExecDefault(
+                    sprintf
+                        "git log -1 --skip=%i --format=format:%%H"
+                        currentSkipCount,
+                    echo = Echo.Off
                 )
                 .UnwrapDefault()
                 .Trim()
@@ -180,29 +170,25 @@ let FindUnpushedCommits (remoteName: string) (remoteBranch: string) =
 
     GitFetch(Some remoteName)
 
-    let remoteBranchExistsCheck =
-        Process.Execute(
-            {
-                Command = "git"
-                Arguments =
-                    sprintf
-                        "show-ref --verify --quiet refs/remotes/%s/%s"
-                        remoteName
-                        remoteBranch
-            },
-            Echo.Off
-        )
-
-    match remoteBranchExistsCheck.Result with
-    | Error _ ->
+    try
+        Process
+            .ExecDefault(
+                sprintf
+                    "git show-ref --verify --quiet refs/remotes/%s/%s"
+                    remoteName
+                    remoteBranch,
+                echo = Echo.Off
+            )
+            .UnwrapDefault(throwWhenWarnings = false)
+        |> ignore<string>
+    with
+    | _ ->
         let exitCode, errMsg =
             ErrRemoteBranchDoesntExist remoteBranch remoteName
 
         Console.Error.WriteLine errMsg
         Environment.Exit exitCode
         failwith <| "Unreachable because of: " + errMsg
-    | WarningsOrAmbiguous _
-    | Success _ -> ()
 
     findUnpushedCommits List.empty 0u List.empty
 
@@ -213,15 +199,11 @@ let GetLastCommits(count: UInt32) =
         else
             let currentHash =
                 Process
-                    .Execute(
-                        {
-                            Command = "git"
-                            Arguments =
-                                sprintf
-                                    "log -1 --skip=%i --format=format:%%H"
-                                    currentSkipCount
-                        },
-                        Echo.Off
+                    .ExecDefault(
+                        sprintf
+                            "git log -1 --skip=%i --format=format:%%H"
+                            currentSkipCount,
+                        echo = Echo.Off
                     )
                     .UnwrapDefault()
                     .Trim()

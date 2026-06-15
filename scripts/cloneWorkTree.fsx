@@ -7,7 +7,7 @@ open System.Linq
 #r "System.Configuration"
 open System.Configuration
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 
 open Fsdk
 open Fsdk.Process
@@ -44,12 +44,8 @@ let ErrNotGitHubCannotDetermineRemoteName dir =
          "Directory '%s' already exists; URL is not GitHub so API cannot be queried to find best name for new remote"
          dir)
 
-let errGitWorktreeAddFailed = (10, "Git worktree add failed.")
-
-let errGitCheckoutFailed = (11, "Git checkout -b failed.")
-
 let ErrFailedToRenameRemote newName =
-    (12, sprintf "Failed to rename remote 'origin' to '%s'." newName)
+    (10, sprintf "Failed to rename remote 'origin' to '%s'." newName)
 
 type ArgType =
     | Url of fullUrl: string * owner: string * headBranch: string
@@ -139,13 +135,9 @@ let CheckIsGitHubFork (owner: string) (repo: string) : Option<bool> =
 let CheckRemoteBranchExists branchName remote =
     let output =
         Process
-            .Execute(
-                {
-                    Command = "git"
-                    Arguments =
-                        sprintf "ls-remote --heads %s %s" remote branchName
-                },
-                Echo.Off
+            .ExecDefault(
+                sprintf "git ls-remote --heads %s %s" remote branchName,
+                echo = Echo.Off
             )
             .UnwrapDefault()
             .Trim()
@@ -165,13 +157,7 @@ let AllRemotes initialState =
     | _ ->
         let remoteOutput =
             Process
-                .Execute(
-                    {
-                        Command = "git"
-                        Arguments = "remote --verbose"
-                    },
-                    Echo.Off
-                )
+                .ExecDefault("git remote --verbose", echo = Echo.Off)
                 .UnwrapDefault()
 
         Misc.CrossPlatformStringSplitInLines remoteOutput
@@ -234,18 +220,14 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
                 |> ignore<DirectoryInfo>
 
             let headBranch =
-                let gitSymbolicRemoteRef =
-                    {
-                        Command = "git"
-                        Arguments =
-                            sprintf "ls-remote --symref %s HEAD" firstArg
-                    }
-
                 // the split game below is meant to extract "master" from this example output:
                 //     ref: refs/heads/master\tHEAD
                 //     d2f140d0d...\tHEAD
                 Process
-                    .Execute(gitSymbolicRemoteRef, Echo.Off)
+                    .ExecDefault(
+                        sprintf "git ls-remote --symref %s HEAD" firstArg,
+                        echo = Echo.Off
+                    )
                     .UnwrapDefault()
                     .Trim()
                     // FIXME: this parsing logic would be broken in case there's a head branch with a slash in its name,
@@ -329,24 +311,21 @@ match initialState with
       AlreadyCloned = false
       RepoAndFolderName = repoAndFolderName
   } ->
-    let gitClone =
-        {
-            Command = "git"
-            Arguments = sprintf "clone --single-branch --bare %s .bare" fullUrl
-        }
-
-    let cloneProc = Process.Execute(gitClone, Echo.All)
-
-    match cloneProc.Result with
-    | Error _ ->
+    try
+        Process
+            .ExecDefault(
+                sprintf "git clone --single-branch --bare %s .bare" fullUrl
+            )
+            .UnwrapDefault(throwWhenWarnings = false)
+        |> ignore<string>
+    with
+    | _ ->
         // Clean up the directory we created
         Directory.SetCurrentDirectory initialDir
         Directory.Delete(repoAndFolderName, true)
         let exitCode, errMsg = errGitCloneFailed
         Console.Error.WriteLine errMsg
         Environment.Exit exitCode
-    | WarningsOrAmbiguous _
-    | Success _ -> ()
 
     // Create .git file pointing to ./.bare (using F# instead of echo)
     File.WriteAllText(".git", "gitdir: ./.bare" + Environment.NewLine)
@@ -364,24 +343,13 @@ match initialState with
         | Some isFork ->
             if isFork then
                 let newRemoteName = sprintf "%sFork" owner
-                let renameArgs = sprintf "remote rename origin %s" newRemoteName
 
-                let gitRemoteRename =
-                    {
-                        Command = "git"
-                        Arguments = renameArgs
-                    }
-
-                let renameProc = Process.Execute(gitRemoteRename, Echo.All)
-
-                match renameProc.Result with
-                | Error _ ->
-                    let exitCode, errMsg = ErrFailedToRenameRemote newRemoteName
-
-                    Console.Error.WriteLine errMsg
-                    Environment.Exit exitCode
-                | WarningsOrAmbiguous _
-                | Success _ -> ()
+                Process
+                    .ExecDefault(
+                        sprintf "git remote rename origin %s" newRemoteName
+                    )
+                    .UnwrapDefault(throwWhenWarnings = false)
+                |> ignore<string>
 
 | {
       ArgType = Url(fullUrl, owner, _headBranch)
@@ -435,54 +403,41 @@ match initialState with
                     Environment.Exit exitCode
                     failwith <| "Unreachable because of: " + errMsg
 
-        let addRemoteProc =
-            Process.Execute(
-                {
-                    Command = "git"
-                    Arguments = sprintf "remote add %s %s" newRemoteName fullUrl
-                },
-                Echo.All
-            )
-
-        match addRemoteProc.Result with
-        | Error _ ->
+        try
+            Process
+                .ExecDefault(
+                    sprintf "git remote add %s %s" newRemoteName fullUrl
+                )
+                .UnwrapDefault(throwWhenWarnings = false)
+            |> ignore<string>
+        with
+        | _ ->
             let exitCode, errMsg = ErrFailedToAddRemote fullUrl
             Console.Error.WriteLine errMsg
-
             Environment.Exit exitCode
-        | WarningsOrAmbiguous _
-        | Success _ -> ()
 | _ -> ()
 
 // Ensure the target branch (and head branch, in case we want to rebase) are
 // included in fetch refspec if it exists on remote
 if branchTargetInfo.ExistsAlready then
     let branchesToFetch =
-        let headBranchOpt =
+        let headBranch =
             match initialState with
             | {
                   ArgType = Url(_fullUrl, _owner, headBranch)
                   AlreadyCloned = _
                   RepoAndFolderName = _
-              } -> Some headBranch
+              } -> headBranch
             | _ ->
-                let result =
-                    Process.Execute(
-                        {
-                            Command = "git"
-                            Arguments = "symbolic-ref --short HEAD"
-                        },
-                        Echo.Off
+                Process
+                    .ExecDefault(
+                        "git symbolic-ref --short HEAD",
+                        echo = Echo.Off
                     )
+                    .UnwrapDefault(throwWhenWarnings = false)
+                    .Trim()
 
-                match result.Result with
-                | Error _ -> None
-                | WarningsOrAmbiguous _
-                | Success _ -> Some(result.UnwrapDefault().Trim())
-
-        match headBranchOpt with
-        | Some headBranch -> [ headBranch; branchTargetInfo.Name ]
-        | None -> List.singleton branchTargetInfo.Name
+        [ headBranch; branchTargetInfo.Name ]
 
     let allRemoteNames =
         AllRemotes initialState |> Map.toSeq |> Seq.map fst |> Seq.toList
@@ -491,45 +446,23 @@ if branchTargetInfo.ExistsAlready then
     |> Seq.iter(fun remoteName ->
         for branchToFetch in branchesToFetch do
             if CheckRemoteBranchExists branchToFetch remoteName then
-                let gitCmd =
+                let setBranchesCmd =
                     sprintf
-                        "remote set-branches --add %s %s"
+                        "git remote set-branches --add %s %s"
                         remoteName
                         branchToFetch
 
-                let setBranchesProc =
-                    Process.Execute(
-                        {
-                            Command = "git"
-                            Arguments = gitCmd
-                        },
-                        Echo.All
-                    )
-
-                match setBranchesProc.Result with
-                | Error(_exitCode, output) ->
-                    Console.Error.WriteLine(output.ToString())
-                    failwithf "Command 'git %s' failed" gitCmd
-                | _ -> ()
+                Process
+                    .ExecDefault(setBranchesCmd)
+                    .UnwrapDefault(throwWhenWarnings = false)
+                |> ignore<string>
     )
 
 // Fetch all remotes
-let fetchProc =
-    Process.Execute(
-        {
-            Command = "git"
-            Arguments = "fetch --all"
-        },
-        Echo.All
-    )
-
-match fetchProc.Result with
-| Error _ ->
-    let exitCode, errMsg = errGitFetchAllFailed
-    Console.Error.WriteLine errMsg
-    Environment.Exit exitCode
-| WarningsOrAmbiguous _
-| Success _ -> ()
+Process
+    .ExecDefault("git fetch --all")
+    .UnwrapDefault(throwWhenWarnings = false)
+|> ignore<string>
 
 let gitWorktreeAddArgs =
     if branchTargetInfo.ExistsAlready then
@@ -607,21 +540,10 @@ let gitWorktreeAddArgs =
     else
         sprintf "-b %s %s" branchTargetInfo.Name branchTargetInfo.SubFolderName
 
-let cmd =
-    {
-        Command = "git"
-        Arguments = sprintf "worktree add %s" gitWorktreeAddArgs
-    }
-
-let worktreeProc = Process.Execute(cmd, Echo.All)
-
-match worktreeProc.Result with
-| Error _ ->
-    let exitCode, errMsg = errGitWorktreeAddFailed
-    Console.Error.WriteLine errMsg
-    Environment.Exit exitCode
-| WarningsOrAmbiguous _
-| Success _ -> ()
+Process
+    .ExecDefault(sprintf "git worktree add %s" gitWorktreeAddArgs)
+    .UnwrapDefault(throwWhenWarnings = false)
+|> ignore<string>
 
 // If branch already existed, worktree was created from a remote tracking ref
 // and is in detached HEAD state; create or reset the local branch to HEAD
@@ -633,22 +555,10 @@ if branchTargetInfo.ExistsAlready then
             branchTargetInfo.SubFolderName
             branchTargetInfo.Name
 
-    let checkoutProc =
-        Process.Execute(
-            {
-                Command = fullCmd.Split(' ').First()
-                Arguments = fullCmd.Substring("git ".Length)
-            },
-            Echo.All
-        )
-
-    match checkoutProc.Result with
-    | Error _ ->
-        let exitCode, errMsg = errGitCheckoutFailed
-        Console.Error.WriteLine errMsg
-        Environment.Exit exitCode
-    | WarningsOrAmbiguous _
-    | Success _ -> ()
+    Process
+        .ExecDefault(fullCmd)
+        .UnwrapDefault(throwWhenWarnings = false)
+    |> ignore<string>
 
     Console.WriteLine(
         sprintf

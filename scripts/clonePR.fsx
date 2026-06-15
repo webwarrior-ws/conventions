@@ -8,12 +8,15 @@ open System.Text.RegularExpressions
 #r "System.Configuration"
 open System.Configuration
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
+
+open Fsdk
+open Fsdk.Process
+
 #r "nuget: FSharp.Data, Version=5.0.2"
 
 open FSharp.Data
-open Fsdk
-open Fsdk.Process
+
 
 let errUsage = (1, $"Usage: dotnet fsi {__SOURCE_FILE__} <prUrl>")
 
@@ -29,8 +32,6 @@ let ErrFailedToExtractHeadRepoUrl exMsg =
 
 let ErrFailedToExtractHeadBranch exMsg =
     (5, sprintf "Failed to extract head branch from PR data: %s" exMsg)
-
-let errCloneWorkTreeFailed = (6, "cloneWorkTree.fsx failed")
 
 let args = Misc.FsxOnlyArguments()
 
@@ -118,20 +119,9 @@ Console.WriteLine $"PR #{prNumber} source branch: {headBranch}"
 let cloneWorkTreeScript =
     Path.Combine(__SOURCE_DIRECTORY__, "cloneWorkTree.fsx")
 
-let dotnetFsi =
-    {
-        Command = "dotnet"
-        Arguments =
-            $"fsi \"{cloneWorkTreeScript}\" \"{headRepoUrl}\" \"{headBranch}\""
-    }
-
-let proc = Process.Execute(dotnetFsi, Echo.All)
-
-match proc.Result with
-| Error _ ->
-    let exitCode, errMsg = errCloneWorkTreeFailed
-    Console.Error.WriteLine errMsg
-
-    Environment.Exit exitCode
-| WarningsOrAmbiguous _
-| Success _ -> ()
+Process
+    .ExecDefault(
+        $"dotnet fsi \"{cloneWorkTreeScript}\" \"{headRepoUrl}\" \"{headBranch}\""
+    )
+    .UnwrapDefault(throwWhenWarnings = false)
+|> ignore<string>
