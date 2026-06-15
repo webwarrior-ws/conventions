@@ -40,14 +40,10 @@ if String.IsNullOrEmpty githubToken then
     Environment.Exit exitCode
 
 let GetPreviousCommitsHashes() =
-    Fsdk
-        .Process
-        .Execute(
-            {
-                Command = "git"
-                Arguments = "log --pretty=format:%H"
-            },
-            Echo.Off
+    Process
+        .ExecDefault(
+            "git log --pretty=format:%H",
+            echo = Echo.Off
         )
         .UnwrapDefault()
         .Trim()
@@ -188,15 +184,8 @@ let whatArtifactsToDelete =
 let DoesCommitExistInTheRepoAndBranch(commit: string) =
     let branchesTheCommitBelongsTo =
         try
-            Fsdk
-                .Process
-                .Execute(
-                    {
-                        Command = "git"
-                        Arguments = $"branch --contains {commit}"
-                    },
-                    Echo.Off
-                )
+            Process
+                .ExecDefault($"git branch --contains {commit}", echo = Echo.Off)
                 .UnwrapDefault()
                 .Trim()
         with
@@ -255,20 +244,14 @@ match whatArtifactsToDelete with
         "About to delete all the artifacts of branchless commits..."
 
     // Make sure git has complete history before checking for branchless commits.
-    let gitFetchUnshallowResult =
-        Fsdk.Process.Execute(
-            {
-                Command = "git"
-                // The special depth 2147483647 means infinite depth, see https://git-scm.com/docs/shallow
-                Arguments = "fetch --depth=2147483647"
-            },
-            Echo.Off
+    Process
+        .ExecDefault(
+            // The special depth 2147483647 means infinite depth, see https://git-scm.com/docs/shallow
+            "git fetch --depth=2147483647",
+            echo = Echo.Off
         )
-    // Fsdk may categorize normal output of git fetch as WarningsOrAmbiguous, so have to treat it as succcess.
-    match gitFetchUnshallowResult.Result with
-    | Success _
-    | WarningsOrAmbiguous _ -> ()
-    | Error _ -> gitFetchUnshallowResult.UnwrapDefault() |> ignore<string>
+        .UnwrapDefault(throwWhenWarnings = false)
+    |> ignore<string>
 
     let orphanArtifactIdsToDelete =
         artifactIds

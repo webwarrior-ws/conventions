@@ -41,15 +41,8 @@ if String.IsNullOrEmpty githubToken then
 let numberOfLatestReleasesToKeep = 2
 
 let gitTags =
-    Fsdk
-        .Process
-        .Execute(
-            {
-                Command = "git"
-                Arguments = "tag --sort=creatordate"
-            },
-            Echo.Off
-        )
+    Process
+        .ExecDefault("git tag --sort=creatordate", echo = Echo.Off)
         .UnwrapDefault()
         .Trim()
         .Split(Environment.NewLine)

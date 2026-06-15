@@ -16,15 +16,8 @@ open Fsdk
 open Fsdk.Process
 
 let commitMsg =
-    Fsdk
-        .Process
-        .Execute(
-            {
-                Command = "git"
-                Arguments = "log -1 --format=%B"
-            },
-            Echo.Off
-        )
+    Process
+        .ExecDefault("git log -1 --format=%B", echo = Echo.Off)
         .UnwrapDefault()
         .Trim()
 
@@ -56,15 +49,10 @@ let newCommitMsg =
         header + Environment.NewLine + Environment.NewLine + wrappedBody
     | _ -> header
 
-Fsdk
-    .Process
-    .Execute(
-        {
-            Command = "git"
-            Arguments =
-                $"commit --amend --message \"{EscapeDoubleQuotes newCommitMsg}\""
-        },
-        Echo.OutputOnly
+Process
+    .ExecDefault(
+        $"git commit --amend --message \"{EscapeDoubleQuotes newCommitMsg}\"",
+        echo = Echo.OutputOnly
     )
     .UnwrapDefault()
     .Trim()

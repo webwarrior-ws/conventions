@@ -107,50 +107,26 @@ if fsharpLintDefaultConfigFile.Exists && not fsharpLintConfigFile.Exists then
     fsharpLintDefaultConfigFile.CopyTo(fsharpLintConfigFile.FullName, false)
     |> ignore<FileInfo>
 
-Fsdk
-    .Process
-    .Execute(
-        {
-            Command = "dotnet"
-            Arguments = sprintf "new tool-manifest --force"
-        },
-        Fsdk.Process.Echo.All
+Process
+    .ExecDefault("dotnet new tool-manifest --force")
+    .UnwrapDefault()
+|> ignore<string>
+
+Process
+    .ExecDefault(
+        sprintf "dotnet tool install dotnet-fsharplint --version %s" version
     )
     .UnwrapDefault()
 |> ignore<string>
 
-Fsdk
-    .Process
-    .Execute(
-        {
-            Command = "dotnet"
-            Arguments =
-                sprintf "tool install dotnet-fsharplint --version %s" version
-        },
-        Fsdk.Process.Echo.All
-    )
-    .UnwrapDefault()
-|> ignore<string>
-
-Fsdk
-    .Process
-    .Execute(
-        {
-            Command = "dotnet"
-            Arguments = sprintf "build %s" targetSolution.FullName
-        },
-        Fsdk.Process.Echo.All
-    )
+Process
+    .ExecDefault(sprintf "dotnet build %s" targetSolution.FullName)
     .UnwrapDefault()
 |> ignore<string>
 
 let RunFSharpLint(target: FileInfo) =
-    Fsdk.Process.Execute(
-        {
-            Command = "dotnet"
-            Arguments = sprintf "dotnet-fsharplint lint %s" target.FullName
-        },
-        Fsdk.Process.Echo.All
+    Process.ExecDefault(
+        sprintf "dotnet dotnet-fsharplint lint %s" target.FullName
     )
 
 RunFSharpLint(targetSolution).UnwrapDefault() |> ignore<string>
