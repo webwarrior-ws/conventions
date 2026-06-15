@@ -15,7 +15,7 @@ open Fsdk.Process
 let initialDir = Directory.GetCurrentDirectory()
 
 let errUsage =
-    (1, $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl|folderPath> <branchName>")
+    (1, $"Usage: dotnet fsi {__SOURCE_FILE__} <repoUrl|folderPath> [branchName]")
 
 let ErrDirectoryDoesNotExist path =
     (2, sprintf "Directory '%s' does not exist." path)
@@ -178,24 +178,39 @@ let AllRemotes initialState =
         |> Seq.distinctBy fst
         |> Map.ofSeq
 
+let GetCurrentHeadBranch(repoDir: Option<string>) =
+    let maybeExtraFlag =
+        match repoDir with
+        | Some dir -> sprintf "-C %s" dir
+        | None -> String.Empty
+
+    let cmd = sprintf "git %s symbolic-ref --short HEAD" maybeExtraFlag
+
+    Process
+        .ExecDefault(cmd, echo = Echo.Off)
+        .UnwrapDefault(throwWhenWarnings = false)
+        .Trim()
+
 let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
     let args = Misc.FsxOnlyArguments()
 
-    if args.Length <> 2 then
+    if args.Length < 1 || args.Length > 2 then
         let exitCode, errMsg = errUsage
         Console.Error.WriteLine errMsg
 
         Environment.Exit exitCode
 
     let firstArg = args.[0]
-    let branchName = args.[1]
 
-    // Sanitize branch name for use as a folder name by replacing slashes/backslashes with dashes
-    let branchFolderName = branchName.Replace('/', '-').Replace('\\', '-')
+    let maybeBranchName =
+        if args.Length = 2 then
+            Some args.[1]
+        else
+            None
 
     let firstArgIsUrl = IsUrl firstArg
 
-    let alreadyCloned, argType, repoAndFolderName =
+    let alreadyCloned, argType, repoAndFolderName, defaultBranchName =
         if firstArgIsUrl then
             let owner, repoAndFolderName =
                 ExtractGhOwnerAndRepoNameFromUrl firstArg
@@ -239,7 +254,10 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
                     .Split('\t')
                     .First()
 
-            existing, Url(firstArg, owner, headBranch), repoAndFolderName
+            existing,
+            Url(firstArg, owner, headBranch),
+            repoAndFolderName,
+            headBranch
         else
             let fullPath = Path.GetFullPath firstArg
 
@@ -258,7 +276,15 @@ let (initialState, branchTargetInfo): (InitialState * BranchTargetInfo) =
 
                 Environment.Exit exitCode
 
-            true, FolderName, firstArg
+            true, FolderName, firstArg, GetCurrentHeadBranch(Some fullPath)
+
+    let branchName =
+        match maybeBranchName with
+        | Some name -> name
+        | None -> defaultBranchName
+
+    // Sanitize branch name for use as a folder name by replacing slashes/backslashes with dashes
+    let branchFolderName = branchName.Replace('/', '-').Replace('\\', '-')
 
     let initialState =
         {
@@ -428,14 +454,7 @@ if branchTargetInfo.ExistsAlready then
                   AlreadyCloned = _
                   RepoAndFolderName = _
               } -> headBranch
-            | _ ->
-                Process
-                    .ExecDefault(
-                        "git symbolic-ref --short HEAD",
-                        echo = Echo.Off
-                    )
-                    .UnwrapDefault(throwWhenWarnings = false)
-                    .Trim()
+            | _ -> GetCurrentHeadBranch None
 
         [ headBranch; branchTargetInfo.Name ]
 
