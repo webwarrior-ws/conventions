@@ -7,7 +7,7 @@ open System.Linq
 #r "System.Configuration"
 open System.Configuration
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 
 open Fsdk
 open Fsdk.Process
@@ -633,14 +633,7 @@ if branchTargetInfo.ExistsAlready then
             branchTargetInfo.SubFolderName
             branchTargetInfo.Name
 
-    let checkoutProc =
-        Process.Execute(
-            {
-                Command = fullCmd.Split(' ').First()
-                Arguments = fullCmd.Substring("git ".Length)
-            },
-            Echo.All
-        )
+    let checkoutProc = Process.ExecDefault fullCmd
 
     match checkoutProc.Result with
     | Error _ ->

@@ -3,7 +3,7 @@
 open System
 open System.IO
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 #load "../src/FileConventions/Helpers.fs"
 
 Fsdk
@@ -26,7 +26,7 @@ Fsdk
             Command = "dotnet"
             Arguments =
                 sprintf
-                    "tool install fsxc --version 0.9.99--date20260525-0605.git-a5cfc39"
+                    "tool install fsxc --version 0.9.99--date20260615-1007.git-0e932e5"
         },
         Fsdk.Process.Echo.All
     )

@@ -6,7 +6,7 @@ open System.IO
 #r "System.Core.dll"
 #r "System.Xml.Linq.dll"
 
-#r "nuget: Fsdk, Version=0.9.99--date20260525-0605.git-a5cfc39"
+#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
 
 open Fsdk
 
