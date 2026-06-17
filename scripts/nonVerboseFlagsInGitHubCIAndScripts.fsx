@@ -22,15 +22,33 @@ let validExtensions =
         ".sh"
     }
 
-let invalidFiles =
+let invalidFilesWithLines =
     validExtensions
     |> Seq.collect(fun ext ->
-        Helpers.GetInvalidFiles
-            targetDir
-            ("*" + ext)
-            FileConventions.NonVerboseFlags
+        Helpers.GetFiles targetDir ("*" + ext)
+        |> Seq.map(fun fileInfo ->
+            let lines = FileConventions.GetNonVerboseFlagLines fileInfo
+            fileInfo, lines
+        )
+        |> Seq.filter(fun (_, lines) -> not lines.IsEmpty)
     )
+    |> Seq.toList
 
 let message = "Please don't use non-verbose flags in the following files:"
 
-Helpers.AssertNoInvalidFiles invalidFiles message
+if invalidFilesWithLines.Length > 0 then
+    let details =
+        invalidFilesWithLines
+        |> Seq.map(fun (fileInfo, lines) ->
+            let lineDetails =
+                lines
+                |> Seq.map(fun (lineNum, line) ->
+                    sprintf "  Line %i: %s" lineNum line
+                )
+                |> String.concat Environment.NewLine
+
+            fileInfo.FullName + Environment.NewLine + lineDetails
+        )
+        |> String.concat Environment.NewLine
+
+    failwith(message + Environment.NewLine + details)
