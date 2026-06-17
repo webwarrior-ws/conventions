@@ -551,6 +551,9 @@ let allowedNonVerboseFlags =
         // even if env in linux has --split-string=foo as equivalent to env -S, it
         // doesn't seem to be present in macOS' env man page and doesn't work either
         "env -S"
+
+        // bash builtin read has no verbose equivalent for its raw mode flag
+        "read -r"
     }
 
 let GetNonVerboseFlagLines(fileInfo: FileInfo) =
