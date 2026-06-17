@@ -551,9 +551,12 @@ let allowedNonVerboseFlags =
         // even if env in linux has --split-string=foo as equivalent to env -S, it
         // doesn't seem to be present in macOS' env man page and doesn't work either
         "env -S"
+
+        // bash builtin read has no verbose equivalent for its raw mode flag
+        "read -r"
     }
 
-let NonVerboseFlags(fileInfo: FileInfo) =
+let GetNonVerboseFlagLines(fileInfo: FileInfo) =
     let validExtensions =
         seq {
             ".yml"
@@ -571,27 +574,26 @@ let NonVerboseFlags(fileInfo: FileInfo) =
         let sep = ","
 
         failwith
-            $"NonVerboseFlags function only supports {String.concat sep validExtensions} files."
+            $"GetNonVerboseFlagLines function only supports {String.concat sep validExtensions} files."
 
-    let fileLines = File.ReadLines fileInfo.FullName
+    let fileLines = File.ReadLines fileInfo.FullName |> Seq.toArray
 
     let nonVerboseFlagsRegex = Regex("\\s-[a-zA-Z]\\b", RegexOptions.Compiled)
 
-    let numInvalidFlags =
-        fileLines
-        |> Seq.filter(fun line ->
-            let nonVerboseFlag = nonVerboseFlagsRegex.IsMatch line
+    fileLines
+    |> Seq.mapi(fun index line -> (index + 1, line))
+    |> Seq.filter(fun (_, line) ->
+        let nonVerboseFlag = nonVerboseFlagsRegex.IsMatch line
 
-            let allowedNonVerboseFlag =
-                allowedNonVerboseFlags
-                |> Seq.map line.Contains
-                |> Seq.contains true
+        let allowedNonVerboseFlag =
+            allowedNonVerboseFlags |> Seq.map line.Contains |> Seq.contains true
 
-            nonVerboseFlag && not allowedNonVerboseFlag
-        )
-        |> Seq.length
+        nonVerboseFlag && not allowedNonVerboseFlag
+    )
+    |> Seq.toList
 
-    numInvalidFlags > 0
+let NonVerboseFlags(fileInfo: FileInfo) =
+    GetNonVerboseFlagLines fileInfo |> List.isEmpty |> not
 
 let IsExecutable(fileInfo: FileInfo) =
     let hasExecuteAccess = Syscall.access(fileInfo.FullName, AccessModes.X_OK)
