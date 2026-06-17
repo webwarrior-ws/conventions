@@ -1305,6 +1305,12 @@ Console.WriteLine "Pull request commits are:"
 for (commitHash, _commitMsg) in prCommits do
     Console.WriteLine commitHash
 
+if Seq.length prCommits = 1 then
+    printfn
+        "Pull request has only 1 commit. Skipping 1-by-1 check because that commit will always have CI status"
+
+    exit 0
+
 // FIXME: there is an edge case not covered here: last commit of PR having
 // "no ci" string, causing PR's CI not to trigger. Solution: move the GHA
 // 'if' attrib (`if: github.event_name == 'pull_request'`) from CI.yml to
