@@ -1401,6 +1401,9 @@ prCommits
             checkSuitesParsedJson.CheckSuites
             // discard check suites for the commit that are not from PR branch
             |> Seq.filter(fun suite -> suite.PullRequests.Length > 0)
+            // check suites with latest_check_runs_count=0 have also created_at=updated_at and conclusion=failure;
+            // they cause false positives, so ignore them
+            |> Seq.filter(fun suite -> suite.LatestCheckRunsCount > 0)
             // take the first one (triggered by push); second one is triggered by pull_request
             |> Seq.tryHead
 
