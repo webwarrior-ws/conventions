@@ -264,6 +264,7 @@ export const abbr = {
     "reference": "ref",
     "references": "refs",
     "receive": "recv",
+    "reduce": "lower",
     "register": "sign-up",
     "remove": "rm",
     "replace": "swap",
