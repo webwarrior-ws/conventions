@@ -1376,63 +1376,105 @@ let expectedFailureSubstringRegexes: List<Regex> =
         )
         expectedFailureSubstrings
 
-prCommits
-|> Seq.iter(fun (commitHash, commitMessage) ->
+let maxTimeToWaitForCiStatus = TimeSpan.FromMinutes 20.0
+let timeBetweenCiStatusCheckRetries = TimeSpan.FromMinutes 1.0
 
-    let url =
-        sprintf
-            "https://api.github.com/repos/%s/commits/%s/check-suites"
-            gitRepo
-            commitHash
+[<TailCall>]
+let rec CheckCiStatus
+    (commitHash: string)
+    (commitMessage: string)
+    (timeRemaining: TimeSpan)
+    =
+    async {
+        let url =
+            sprintf
+                "https://api.github.com/repos/%s/commits/%s/check-suites"
+                gitRepo
+                commitHash
 
-    let checkSuitesJsonString = GitHubApiCall url
+        let checkSuitesJsonString = GitHubApiCall url
 
-    let checkSuitesParsedJson = CheckSuitesType.Parse checkSuitesJsonString
+        let checkSuitesParsedJson = CheckSuitesType.Parse checkSuitesJsonString
 
-    if not(ShouldHaveCiStatus commitMessage) then
-        ()
-    elif expectedFailureSubstringRegexes
-         |> List.exists(fun substringRegex ->
-             substringRegex.IsMatch commitMessage
-         ) then
-        ()
-    else
-        let checkSuiteOfInterest =
-            checkSuitesParsedJson.CheckSuites
-            // discard check suites for the commit that are not from PR branch
-            |> Seq.filter(fun suite -> suite.PullRequests.Length > 0)
-            // check suites with latest_check_runs_count=0 have also created_at=updated_at and conclusion=failure;
-            // they cause false positives, so ignore them
-            |> Seq.filter(fun suite -> suite.LatestCheckRunsCount > 0)
-            // take the first one (triggered by push); second one is triggered by pull_request
-            |> Seq.tryHead
+        if not(ShouldHaveCiStatus commitMessage) then
+            ()
+        elif expectedFailureSubstringRegexes
+             |> List.exists(fun substringRegex ->
+                 substringRegex.IsMatch commitMessage
+             ) then
+            ()
+        else
+            let checkSuiteOfInterest =
+                checkSuitesParsedJson.CheckSuites
+                // discard check suites for the commit that are not from PR branch
+                |> Seq.filter(fun suite -> suite.PullRequests.Length > 0)
+                // check suites with latest_check_runs_count=0 have also created_at=updated_at and conclusion=failure;
+                // they cause false positives, so ignore them
+                |> Seq.filter(fun suite -> suite.LatestCheckRunsCount > 0)
+                // take the first one (triggered by push); second one is triggered by pull_request
+                |> Seq.tryHead
 
-        let status, conclusion =
-            match checkSuiteOfInterest with
-            | Some checkSuite -> checkSuite.Status, checkSuite.Conclusion
-            | None -> failwith "No check suite found"
+            let status, conclusion =
+                match checkSuiteOfInterest with
+                | Some checkSuite -> checkSuite.Status, checkSuite.Conclusion
+                | None -> failwith "No check suite found"
 
-        if status = "completed" && conclusion = "failure" then
-            Console.WriteLine()
+            // see https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/about-status-checks#check-statuses-and-conclusions
+            let incompleteRunStatuses =
+                [
+                    "expected"
+                    "queued"
+                    "in_progress"
+                    "waiting"
+                    "requested"
+                    "pending"
+                ]
 
-            Console.Error.WriteLine
-                $"""Thanks for pushing your commits one by one.
+            if List.contains status incompleteRunStatuses then
+                if timeRemaining < timeBetweenCiStatusCheckRetries then
+                    return ()
+                else
+                    do! Async.Sleep timeBetweenCiStatusCheckRetries
+
+                    return!
+                        CheckCiStatus
+                            commitHash
+                            commitMessage
+                            (timeRemaining - timeBetweenCiStatusCheckRetries)
+            elif status = "completed" && conclusion = "failure" then
+                Console.WriteLine()
+
+                Console.Error.WriteLine
+                    $"""Thanks for pushing your commits one by one.
 
 However, it has been detected that CI is not successful (green ✅ colour) for one or more commits, or it passes (instead of being red ❌ colour) when a failing test is added (or failing CI is expected), as determined by its commit message.
 
 See commit '{commitHash}' for the first occurrence of this issue."""
 
-            let expectedFailureSubstringsJoined =
-                String.Join(
-                    " or ",
-                    expectedFailureSubstrings |> Seq.map(fun str -> $"'{str}'")
-                )
+                let expectedFailureSubstringsJoined =
+                    String.Join(
+                        " or ",
+                        expectedFailureSubstrings
+                        |> Seq.map(fun str -> $"'{str}'")
+                    )
 
-            Console.Error.WriteLine
-                $"Hint: if you want to state that a commit can have red CI because of adding a failing test, please make sure that the commit message contains the {expectedFailureSubstringsJoined} term"
+                Console.Error.WriteLine
+                    $"Hint: if you want to state that a commit can have red CI because of adding a failing test, please make sure that the commit message contains the {expectedFailureSubstringsJoined} term"
 
-            let exitCode, errMsg = errCiNotSuccessful
-            Console.Error.WriteLine errMsg
-            Environment.Exit exitCode
-            failwith <| "Unreachable because of: " + errMsg
+                let exitCode, errMsg = errCiNotSuccessful
+                Console.Error.WriteLine errMsg
+                Environment.Exit exitCode
+                failwith <| "Unreachable because of: " + errMsg
+    }
+
+prCommits
+|> Seq.mapi(fun index (commitHash, commitMessage) ->
+    async {
+        // stagger checkCiStatus calls in time to minimize mess in console oputput
+        do! Async.Sleep(TimeSpan.FromSeconds(float index * 2.0))
+        do! CheckCiStatus commitHash commitMessage maxTimeToWaitForCiStatus
+    }
 )
+|> Async.Parallel
+|> Async.RunSynchronously
+|> ignore<array<unit>>
