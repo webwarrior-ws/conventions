@@ -1290,6 +1290,8 @@ repository or organization and click on Actions button, then select General. Fro
 
     result
 
+let prHeadCommitHash = parsedJsonObj.PullRequest.Head.Sha
+
 let prCommits =
     let url = parsedJsonObj.PullRequest.Links.Commits.Href
 
@@ -1297,8 +1299,19 @@ let prCommits =
 
     let parsedPrCommitsJsonObj = PRCommitsType.Parse prCommitsJsonString
 
-    parsedPrCommitsJsonObj
-    |> Seq.map(fun commit -> (commit.Sha, commit.Commit.Message))
+    match
+        parsedPrCommitsJsonObj
+        |> Seq.tryFindIndex(fun commit -> commit.Sha = prHeadCommitHash)
+        with
+    | Some headCommitIndex ->
+        // Don't include commits after this PR head.
+        parsedPrCommitsJsonObj
+        |> Seq.take(headCommitIndex + 1)
+        |> Seq.map(fun commit -> (commit.Sha, commit.Commit.Message))
+    | None ->
+        failwithf
+            "PR commits must include head commit. Must be a bug in %s."
+            __SOURCE_FILE__
 
 Console.WriteLine "Pull request commits are:"
 
