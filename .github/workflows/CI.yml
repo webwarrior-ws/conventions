@@ -28,7 +28,7 @@ jobs:
       - name: Compute MD5 sum of Dockerfile
         id: md5sum
         run: |
-          echo "tag=$(md5sum Dockerfile | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "tag=$(md5sum Dockerfile.base | awk '{print $1}')" >> $GITHUB_OUTPUT
 
   docker-img-build-push:
     needs: calc-docker-img-tag
