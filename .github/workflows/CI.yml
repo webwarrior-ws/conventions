@@ -17,23 +17,22 @@ env:
   TYPESCRIPT_ESLINT_VERSION: "8.55.0"
   ESLINT_VERSION: "9.39.2"
   CHECKOUT_ACTION_VERSION: "4"
-  IMAGES: "base extras"
 
 jobs:
   calc-docker-img-tag:
     runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        image: [base, extras]
     outputs:
       base: ${{ steps.md5sum.outputs.base }}
       extras: ${{ steps.md5sum.outputs.extras }}
     steps:
       - uses: actions/checkout@v4
-      - name: Compute MD5 sum of Dockerfile
+      - name: Compute MD5 sums of Dockerfiles
         id: md5sum
         run: |
-          echo "${{ matrix.image }}=$(md5sum Dockerfile.${{ matrix.image }} | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "base=$(md5sum Dockerfile.base | awk '{print $1}')" >> $GITHUB_OUTPUT
+          git apply Dockerfile.extras
+          echo "extras=$(md5sum Dockerfile.base | awk '{print $1}')" >> $GITHUB_OUTPUT
+          git clean -fdx
 
   docker-img-build-push:
     needs: calc-docker-img-tag
@@ -67,7 +66,10 @@ jobs:
         run: |
           TAG=${{ needs.calc-docker-img-tag.outputs[matrix.image] }}
           IMAGE=ghcr.io/${{ github.repository_owner }}/conventions-ci
-          docker build --tag $IMAGE:$TAG --file Dockerfile.${{ matrix.image }} .
+          if [ "${{ matrix.image }}" == "extras" ]; then
+            git apply Dockerfile.extras
+          fi
+          docker build --tag $IMAGE:$TAG --file Dockerfile.base .
           docker push $IMAGE:$TAG
       - name: Delete other GHCR package versions (keep current)
         if: steps.check.outputs.image_exists == 'false'
