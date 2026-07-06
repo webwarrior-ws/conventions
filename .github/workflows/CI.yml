@@ -17,22 +17,30 @@ env:
   TYPESCRIPT_ESLINT_VERSION: "8.55.0"
   ESLINT_VERSION: "9.39.2"
   CHECKOUT_ACTION_VERSION: "4"
+  IMAGES: "base extras"
 
 jobs:
   calc-docker-img-tag:
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        image: [base, extras]
     outputs:
-      tag: ${{ steps.md5sum.outputs.tag }}
+      base: ${{ steps.md5sum.outputs.base }}
+      extras: ${{ steps.md5sum.outputs.extras }}
     steps:
       - uses: actions/checkout@v4
       - name: Compute MD5 sum of Dockerfile
         id: md5sum
         run: |
-          echo "tag=$(md5sum Dockerfile.base | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "${{ matrix.image }}=$(md5sum Dockerfile.${{ matrix.image }} | awk '{print $1}')" >> $GITHUB_OUTPUT
 
   docker-img-build-push:
     needs: calc-docker-img-tag
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        image: [base, extras]
     permissions:
       contents: read
       packages: write
@@ -47,7 +55,7 @@ jobs:
       - name: Check if image exists
         id: check
         run: |
-          TAG=${{ needs.calc-docker-img-tag.outputs.tag }}
+          TAG=${{ needs.calc-docker-img-tag.outputs[matrix.image] }}
           IMAGE=ghcr.io/${{ github.repository_owner }}/conventions-ci:$TAG
           if docker manifest inspect $IMAGE > /dev/null 2>&1; then
             echo "image_exists=true" >> $GITHUB_OUTPUT
@@ -57,14 +65,15 @@ jobs:
       - name: Build and push image
         if: steps.check.outputs.image_exists == 'false'
         run: |
-          TAG=${{ needs.calc-docker-img-tag.outputs.tag }}
+          TAG=${{ needs.calc-docker-img-tag.outputs[matrix.image] }}
           IMAGE=ghcr.io/${{ github.repository_owner }}/conventions-ci
-          docker build --tag $IMAGE:$TAG --file Dockerfile.base .
+          docker build --tag $IMAGE:$TAG --file Dockerfile.${{ matrix.image }} .
           docker push $IMAGE:$TAG
       - name: Delete other GHCR package versions (keep current)
         if: steps.check.outputs.image_exists == 'false'
         env:
-          TAG: ${{ needs.calc-docker-img-tag.outputs.tag }}
+          TAG_BASE: ${{ needs.calc-docker-img-tag.outputs.base }}
+          TAG_EXTRAS: ${{ needs.calc-docker-img-tag.outputs.extras }}
         run: |
           PACKAGE=conventions-ci
           OWNER=${{ github.repository_owner }}
@@ -79,8 +88,11 @@ jobs:
             API_BASE="https://api.github.com/users/${OWNER}/packages/container/${PACKAGE}/versions"
           fi
 
-          # Delete all versions that don't have the current tag
-          echo "$VERSIONS" | jq --raw-output --arg TAG "$TAG" '.[] | select(.metadata.container.tags | index($TAG) | not) | .id' | while read -r VERSION_ID; do
+          # Delete all versions that have neither the base nor the extras tag
+          echo "$VERSIONS" | jq --raw-output \
+            --arg TAG_BASE "$TAG_BASE" \
+            --arg TAG_EXTRAS "$TAG_EXTRAS" \
+            '.[] | select((.metadata.container.tags | index($TAG_BASE) | not) and (.metadata.container.tags | index($TAG_EXTRAS) | not)) | .id' | while read -r VERSION_ID; do
             echo "Deleting version $VERSION_ID"
             curl --silent --request DELETE --header "$AUTH_HEADER" "${API_BASE}/${VERSION_ID}"
           done
