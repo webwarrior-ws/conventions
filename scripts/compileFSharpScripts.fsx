@@ -3,7 +3,7 @@
 open System
 open System.IO
 
-#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
+#r "nuget: Fsdk, Version=0.9.99--date20260618-1029.git-79ec1be"
 
 open Fsdk
 
@@ -18,7 +18,7 @@ Process
 Process
     .ExecDefault(
         sprintf
-            "dotnet tool install fsxc --version 0.9.99--date20260615-1007.git-0e932e5"
+            "dotnet tool install fsxc --version 0.9.99--date20260618-1029.git-79ec1be"
     )
     .UnwrapDefault()
 |> ignore<string>
