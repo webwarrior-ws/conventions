@@ -1,12 +1,16 @@
 diff --git a/Dockerfile.base b/Dockerfile.base
-index 099e36d..760311d 100644
+index 099e36d..ea43585 100644
 --- a/Dockerfile.base
 +++ b/Dockerfile.base
-@@ -16,6 +16,8 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
+@@ -16,6 +16,12 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
  RUN apt --yes install --no-install-recommends npm
  RUN npm install --global yarn
  
++RUN apt install --yes --no-install-recommends postgresql
 +RUN apt install --yes --no-install-recommends nginx
++RUN apt install --yes --no-install-recommends socat
++# for `make` command
++RUN apt install --yes --no-install-recommends build-essential
 +
  # cleanup apt cache to reduce img size & avoid unneeded files in the final layer
  RUN rm -rf /var/lib/apt/lists/*
