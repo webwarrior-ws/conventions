@@ -1,16 +1,25 @@
 diff --git a/Dockerfile.base b/Dockerfile.base
-index 099e36d..ea43585 100644
+index 099e36d..7350b25 100644
 --- a/Dockerfile.base
 +++ b/Dockerfile.base
-@@ -16,6 +16,12 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
+@@ -16,6 +16,21 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
  RUN apt --yes install --no-install-recommends npm
  RUN npm install --global yarn
  
++RUN apt install --yes --no-install-recommends wget
 +RUN apt install --yes --no-install-recommends postgresql
 +RUN apt install --yes --no-install-recommends nginx
 +RUN apt install --yes --no-install-recommends socat
 +# for `make` command
 +RUN apt install --yes --no-install-recommends build-essential
++
++# Pulumi CLI
++ARG PULUMI_VERSION=3.201.0
++RUN wget https://get.pulumi.com/releases/sdk/pulumi-v$PULUMI_VERSION-linux-x64.tar.gz --output-document=pulumi.tar.gz
++RUN tar --extract --gzip --verbose --file pulumi.tar.gz
++RUN rm pulumi.tar.gz
++RUN mv ./pulumi /usr/local/bin/pulumi
++RUN chmod +x /usr/local/bin/pulumi
 +
  # cleanup apt cache to reduce img size & avoid unneeded files in the final layer
  RUN rm -rf /var/lib/apt/lists/*
