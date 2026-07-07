@@ -116,7 +116,7 @@ jobs:
     needs: [calc-docker-img-tag, docker-img-build-push]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.tag }}
+      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
         uses: nblockchain/conventions@master
@@ -132,7 +132,7 @@ jobs:
     needs: [build-fs, calc-docker-img-tag]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.tag }}
+      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
         uses: nblockchain/conventions@master
@@ -146,7 +146,7 @@ jobs:
     needs: [calc-docker-img-tag, docker-img-build-push]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.tag }}
+      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
         uses: nblockchain/conventions@master
@@ -180,7 +180,7 @@ jobs:
     needs: [build-ts, calc-docker-img-tag]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.tag }}
+      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
         uses: nblockchain/conventions@master
@@ -218,7 +218,7 @@ jobs:
       - calc-docker-img-tag
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.tag }}
+      image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
