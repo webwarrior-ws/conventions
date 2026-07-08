@@ -249,51 +249,73 @@ let SplitIntoWords(text: string) =
 
     Seq.toList words
 
-let private WrapParagraph (text: string) (maxCharsPerLine: int) : string =
-    let words = SplitIntoWords text
-
-    let rec processWords
-        (currentLine: string)
-        (wrappedText: string)
-        (remainingWords: List<Text>)
-        : string =
-
-        let isColonBreak (currentLine: string) (textAfter: Text) =
-            currentLine.EndsWith ":" && Char.IsUpper textAfter.Text.[0]
-
-        match remainingWords with
-        | [] -> (wrappedText + currentLine).Trim()
-        | word :: rest ->
-            match currentLine, word with
-            | "", _ -> processWords word.Text wrappedText rest
-            | _,
-              {
-                  Type = PlainText
-              } when
-                String.length currentLine + word.Text.Length + 1
-                <= maxCharsPerLine
-                && not(isColonBreak currentLine word)
-                ->
-                processWords (currentLine + " " + word.Text) wrappedText rest
-            | _,
-              {
-                  Type = PlainText
-              } ->
-                processWords
-                    word.Text
-                    (wrappedText + currentLine + Environment.NewLine)
+[<TailCall>]
+let rec ProcessLines
+    (codeBlockStartOrEndToken: string)
+    (remainingLines: List<string>)
+    (currentParagraphLines: List<string>)
+    (paragraphs: List<string>)
+    (insideCodeBlock: bool)
+    =
+    // process each line individually and form paragraphs
+    match remainingLines with
+    | [] ->
+        if not currentParagraphLines.IsEmpty then
+            String.Join(Environment.NewLine, List.rev currentParagraphLines)
+            :: paragraphs
+        else
+            paragraphs
+    | line :: rest ->
+        if String.IsNullOrWhiteSpace line then
+            // a new paragraph has been detected, if it's inside code block
+            // add to the previous paragraph. Otherwise, join the previous
+            // paragraph to a string and start a new paragraph
+            if insideCodeBlock then
+                ProcessLines
+                    codeBlockStartOrEndToken
                     rest
-            | _, _ ->
-                processWords
-                    String.Empty
-                    (wrappedText
-                     + currentLine
-                     + Environment.NewLine
-                     + word.Text
-                     + Environment.NewLine)
-                    rest
+                    (line :: currentParagraphLines)
+                    paragraphs
+                    insideCodeBlock
+            elif not currentParagraphLines.IsEmpty then
+                let newParagraph =
+                    String.Join(
+                        Environment.NewLine,
+                        List.rev currentParagraphLines
+                    )
 
-    processWords String.Empty String.Empty words
+                ProcessLines
+                    codeBlockStartOrEndToken
+                    rest
+                    List.Empty
+                    (newParagraph :: paragraphs)
+                    insideCodeBlock
+            else
+                ProcessLines
+                    codeBlockStartOrEndToken
+                    rest
+                    List.Empty
+                    paragraphs
+                    insideCodeBlock
+        elif line.Trim().StartsWith codeBlockStartOrEndToken then
+            // start or end of a code block has been detected, the line will
+            // be added to the current paragraph and the state which determines
+            // if we're inside a code block or not is switched.
+            let newInsideCodeBlock = not insideCodeBlock
+
+            ProcessLines
+                codeBlockStartOrEndToken
+                rest
+                (line :: currentParagraphLines)
+                paragraphs
+                newInsideCodeBlock
+        else
+            ProcessLines
+                codeBlockStartOrEndToken
+                rest
+                (line :: currentParagraphLines)
+                paragraphs
+                insideCodeBlock
 
 // This function will extract paragraphs and will ignore the paragraphs inside a
 // code block. Each paragraph is determined by two consecutive new lines.
@@ -301,166 +323,143 @@ let ExtractParagraphs(text: string) =
     let lines = text.Split Environment.NewLine |> Seq.toList
     let codeBlockStartOrEndToken = "```"
 
-    let rec processLines
-        (remainingLines: List<string>)
-        (currentParagraphLines: List<string>)
-        (paragraphs: List<string>)
-        (insideCodeBlock: bool)
-        =
-        // process each line individually and form paragraphs
-        match remainingLines with
-        | [] ->
-            if not currentParagraphLines.IsEmpty then
-                String.Join(Environment.NewLine, List.rev currentParagraphLines)
-                :: paragraphs
-            else
-                paragraphs
-        | line :: rest ->
-            if String.IsNullOrWhiteSpace line then
-                // a new paragraph has been detected, if it's inside code block
-                // add to the previous paragraph. Otherwise, join the previous
-                // paragraph to a string and start a new paragraph
-                if insideCodeBlock then
-                    processLines
-                        rest
-                        (line :: currentParagraphLines)
-                        paragraphs
-                        insideCodeBlock
-                elif not currentParagraphLines.IsEmpty then
-                    let newParagraph =
-                        String.Join(
-                            Environment.NewLine,
-                            List.rev currentParagraphLines
-                        )
+    List.rev
+    <| ProcessLines codeBlockStartOrEndToken lines List.Empty List.Empty false
 
-                    processLines
-                        rest
-                        List.Empty
-                        (newParagraph :: paragraphs)
-                        insideCodeBlock
-                else
-                    processLines rest List.Empty paragraphs insideCodeBlock
-            elif line.Trim().StartsWith codeBlockStartOrEndToken then
-                // start or end of a code block has been detected, the line will
-                // be added to the current paragraph and the state which determines
-                // if we're inside a code block or not is switched.
-                let newInsideCodeBlock = not insideCodeBlock
+[<TailCall>]
+let rec private ProcessWords
+    (maxCharsPerLine: int)
+    (currentLine: string)
+    (wrappedText: string)
+    (remainingWords: List<Text>)
+    : string =
 
-                processLines
-                    rest
-                    (line :: currentParagraphLines)
-                    paragraphs
-                    newInsideCodeBlock
-            else
-                processLines
-                    rest
-                    (line :: currentParagraphLines)
-                    paragraphs
-                    insideCodeBlock
+    let isColonBreak (currentLine: string) (textAfter: Text) =
+        currentLine.EndsWith ":" && Char.IsUpper textAfter.Text.[0]
 
-    List.rev <| processLines lines List.Empty List.Empty false
+    match remainingWords with
+    | [] -> (wrappedText + currentLine).Trim()
+    | word :: rest ->
+        match currentLine, word with
+        | "", _ -> ProcessWords maxCharsPerLine word.Text wrappedText rest
+        | _,
+          {
+              Type = PlainText
+          } when
+            String.length currentLine + word.Text.Length + 1 <= maxCharsPerLine
+            && not(isColonBreak currentLine word)
+            ->
+            ProcessWords
+                maxCharsPerLine
+                (currentLine + " " + word.Text)
+                wrappedText
+                rest
+        | _,
+          {
+              Type = PlainText
+          } ->
+            ProcessWords
+                maxCharsPerLine
+                word.Text
+                (wrappedText + currentLine + Environment.NewLine)
+                rest
+        | _, _ ->
+            ProcessWords
+                maxCharsPerLine
+                String.Empty
+                (wrappedText
+                 + currentLine
+                 + Environment.NewLine
+                 + word.Text
+                 + Environment.NewLine)
+                rest
 
 let WrapText (text: string) (maxCharsPerLine: int) : string =
+    let wrapParagraph (text: string) (maxCharsPerLine: int) : string =
+        let words = SplitIntoWords text
+        ProcessWords maxCharsPerLine String.Empty String.Empty words
+
     let wrappedParagraphs =
         ExtractParagraphs text
-        |> Seq.map(fun paragraph -> WrapParagraph paragraph maxCharsPerLine)
+        |> Seq.map(fun paragraph -> wrapParagraph paragraph maxCharsPerLine)
 
     String.Join(
         $"{Environment.NewLine}{Environment.NewLine}",
         wrappedParagraphs
     )
 
-let private GetVersionsMapFromFiles
-    (fileInfos: seq<FileInfo>)
-    (versionRegexPattern: string)
-    : Map<string, Set<string>> =
-    let versionRegex = Regex(versionRegexPattern, RegexOptions.Compiled)
-
-    let allFilesTexts =
-        fileInfos
-        |> Seq.map(fun fileInfo -> File.ReadAllText fileInfo.FullName)
-        |> String.concat Environment.NewLine
-
-    versionRegex.Matches allFilesTexts
-    |> Seq.fold
-        (fun acc regexMatch ->
-            let key = regexMatch.Groups.[1].ToString()
-            let value = regexMatch.Groups.[2].ToString()
-
-            match Map.tryFind key acc with
-            | Some prevSet -> Map.add key (Set.add value prevSet) acc
-            | None -> Map.add key (Set.singleton value) acc
-        )
-        Map.empty
-
-let private DetectInconsistentVersionsInYamlFiles
-    (fileInfos: seq<FileInfo>)
-    (extractVersionsFunction: YamlNode -> seq<string * string>)
-    =
-    let envVarRegex =
-        Regex(@"\s*\$\{\{\s*([^\s\}]+)\s*\}\}\s*", RegexOptions.Compiled)
-
-    let yamlDocuments =
-        Seq.map
-            (fun (fileInfo: FileInfo) ->
-                let yaml = YamlStream()
-                use reader = new StreamReader(fileInfo.FullName)
-                yaml.Load reader
-                yaml.Documents[0].RootNode
-            )
-            fileInfos
-
-    let versionMap =
-        Seq.fold
-            (fun mapping (yamlDoc: YamlNode) ->
-                let matches =
-                    Seq.collect extractVersionsFunction yamlDoc.AllNodes
-
-                matches
-                |> Seq.fold
-                    (fun acc (key, value) ->
-                        let actualValue =
-                            let variableRegexMatch = envVarRegex.Match value
-
-                            if variableRegexMatch.Success then
-                                let yamlDict = yamlDoc :?> YamlMappingNode
-
-                                match yamlDict.Children.TryGetValue "env" with
-                                | true, (:? YamlMappingNode as envDict) ->
-                                    let referenceString =
-                                        variableRegexMatch.Groups.[1].Value
-
-                                    let envVarName =
-                                        if referenceString.StartsWith "env." then
-                                            referenceString.[4..]
-                                        else
-                                            referenceString
-
-                                    match
-                                        envDict.Children.TryGetValue envVarName
-                                        with
-                                    | true, envVarValue ->
-                                        (envVarValue :?> YamlScalarNode).Value
-                                    | false, _ -> value
-                                | _ -> value
-                            else
-                                value
-
-                        match Map.tryFind key acc with
-                        | Some prevSet ->
-                            Map.add key (Set.add actualValue prevSet) acc
-                        | None -> Map.add key (Set.singleton actualValue) acc
-                    )
-                    mapping
-            )
-            Map.empty
-            yamlDocuments
-
-    versionMap
-    |> Seq.map(fun item -> Seq.length item.Value > 1)
-    |> Seq.contains true
-
 let DetectInconsistentVersionsInGitHubCIWorkflow(fileInfos: seq<FileInfo>) =
+    let detectInconsistentVersionsInYamlFiles
+        (fileInfos: seq<FileInfo>)
+        (extractVersionsFunction: YamlNode -> seq<string * string>)
+        =
+        let envVarRegex =
+            Regex(@"\s*\$\{\{\s*([^\s\}]+)\s*\}\}\s*", RegexOptions.Compiled)
+
+        let yamlDocuments =
+            Seq.map
+                (fun (fileInfo: FileInfo) ->
+                    let yaml = YamlStream()
+                    use reader = new StreamReader(fileInfo.FullName)
+                    yaml.Load reader
+                    yaml.Documents[0].RootNode
+                )
+                fileInfos
+
+        let versionMap =
+            Seq.fold
+                (fun mapping (yamlDoc: YamlNode) ->
+                    let matches =
+                        Seq.collect extractVersionsFunction yamlDoc.AllNodes
+
+                    matches
+                    |> Seq.fold
+                        (fun acc (key, value) ->
+                            let actualValue =
+                                let variableRegexMatch = envVarRegex.Match value
+
+                                if variableRegexMatch.Success then
+                                    let yamlDict = yamlDoc :?> YamlMappingNode
+
+                                    match yamlDict.Children.TryGetValue "env"
+                                        with
+                                    | true, (:? YamlMappingNode as envDict) ->
+                                        let referenceString =
+                                            variableRegexMatch.Groups.[1].Value
+
+                                        let envVarName =
+                                            if referenceString.StartsWith "env." then
+                                                referenceString.[4..]
+                                            else
+                                                referenceString
+
+                                        match
+                                            envDict.Children.TryGetValue
+                                                envVarName
+                                            with
+                                        | true, envVarValue ->
+                                            (envVarValue :?> YamlScalarNode)
+                                                .Value
+                                        | false, _ -> value
+                                    | _ -> value
+                                else
+                                    value
+
+                            match Map.tryFind key acc with
+                            | Some prevSet ->
+                                Map.add key (Set.add actualValue prevSet) acc
+                            | None ->
+                                Map.add key (Set.singleton actualValue) acc
+                        )
+                        mapping
+                )
+                Map.empty
+                yamlDocuments
+
+        versionMap
+        |> Seq.map(fun item -> Seq.length item.Value > 1)
+        |> Seq.contains true
+
     fileInfos
     |> Seq.iter(fun fileInfo -> assert (fileInfo.FullName.EndsWith ".yml"))
 
@@ -496,7 +495,7 @@ let DetectInconsistentVersionsInGitHubCIWorkflow(fileInfos: seq<FileInfo>) =
             )
         | _ -> Seq.empty
 
-    DetectInconsistentVersionsInYamlFiles fileInfos extractVersions
+    detectInconsistentVersionsInYamlFiles fileInfos extractVersions
 
 let DetectInconsistentVersionsInGitHubCI(dir: DirectoryInfo) =
     let ymlFiles = dir.GetFiles("*.yml", SearchOption.AllDirectories)
@@ -507,13 +506,36 @@ let DetectInconsistentVersionsInGitHubCI(dir: DirectoryInfo) =
         DetectInconsistentVersionsInGitHubCIWorkflow ymlFiles
 
 let GetVersionsMapForNugetRefsInFSharpScripts(fileInfos: seq<FileInfo>) =
+    let getVersionsMapFromFiles
+        (fileInfos: seq<FileInfo>)
+        (versionRegexPattern: string)
+        : Map<string, Set<string>> =
+        let versionRegex = Regex(versionRegexPattern, RegexOptions.Compiled)
+
+        let allFilesTexts =
+            fileInfos
+            |> Seq.map(fun fileInfo -> File.ReadAllText fileInfo.FullName)
+            |> String.concat Environment.NewLine
+
+        versionRegex.Matches allFilesTexts
+        |> Seq.fold
+            (fun acc regexMatch ->
+                let key = regexMatch.Groups.[1].ToString()
+                let value = regexMatch.Groups.[2].ToString()
+
+                match Map.tryFind key acc with
+                | Some prevSet -> Map.add key (Set.add value prevSet) acc
+                | None -> Map.add key (Set.singleton value) acc
+            )
+            Map.empty
+
     fileInfos
     |> Seq.iter(fun fileInfo -> assert (fileInfo.FullName.EndsWith ".fsx"))
 
     let versionRegexPattern =
         "#r \"nuget:\\s*([^\\s]*)\\s*,\\s*Version\\s*=\\s*([^\\s]*)\\s*\""
 
-    GetVersionsMapFromFiles fileInfos versionRegexPattern
+    getVersionsMapFromFiles fileInfos versionRegexPattern
 
 let DetectInconsistentVersionsInNugetRefsInFSharpScripts
     (fileInfos: seq<FileInfo>)
