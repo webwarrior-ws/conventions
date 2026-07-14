@@ -3,13 +3,13 @@
 open System.IO
 open System.Linq
 
-#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
+#r "nuget: Fsdk, Version=0.9.99--date20260618-1029.git-79ec1be"
 
 open Fsdk
 
 #load "../src/FileConventions/Helpers.fs"
 
-let version = "0.26.9--date20251224-1009.git-f84ead9"
+let version = "0.27.1--date20260709-0311.git-bd94a09"
 
 let targetSol =
     let args = Fsdk.Misc.FsxOnlyArguments()

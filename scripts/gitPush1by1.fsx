@@ -8,7 +8,7 @@ open System.Threading
 #r "System.Configuration"
 open System.Configuration
 
-#r "nuget: Fsdk, Version=0.9.99--date20260615-1007.git-0e932e5"
+#r "nuget: Fsdk, Version=0.9.99--date20260618-1029.git-79ec1be"
 
 open Fsdk
 open Fsdk.Process
@@ -123,51 +123,57 @@ let GetLastNthCommitFromRemoteBranch
     let commitHash = firstLine.Split([| " " |], StringSplitOptions.None).[1]
     commitHash
 
+[<TailCall>]
+let rec private FindIntersection localCommits (remoteCommits: List<string>) =
+    match localCommits with
+    | [] -> None
+    | head :: tail ->
+        if remoteCommits.Contains head then
+            Some tail
+        else
+            FindIntersection tail remoteCommits
+
+[<TailCall>]
+let rec private FindUnpushedCommitsInternal
+    localCommitsWalkedSoFar
+    currentSkipCount
+    remoteCommits
+    remoteName
+    remoteBranch
+    =
+    Console.WriteLine "Walking tree..."
+
+    let currentHash =
+        Process
+            .ExecDefault(
+                sprintf
+                    "git log -1 --skip=%i --format=format:%%H"
+                    currentSkipCount,
+                echo = Echo.Off
+            )
+            .UnwrapDefault()
+            .Trim()
+
+    let newRemoteCommits =
+        (GetLastNthCommitFromRemoteBranch
+            remoteName
+            remoteBranch
+            currentSkipCount)
+        :: remoteCommits
+
+    let newLocalCommitsWalkedSoFar = currentHash :: localCommitsWalkedSoFar
+
+    match FindIntersection newLocalCommitsWalkedSoFar newRemoteCommits with
+    | Some theCommitsToPush -> theCommitsToPush
+    | None ->
+        FindUnpushedCommitsInternal
+            newLocalCommitsWalkedSoFar
+            (currentSkipCount + 1u)
+            newRemoteCommits
+            remoteName
+            remoteBranch
+
 let FindUnpushedCommits (remoteName: string) (remoteBranch: string) =
-    let rec findUnpushedCommits
-        localCommitsWalkedSoFar
-        currentSkipCount
-        remoteCommits
-        =
-        let rec findIntersection localCommits (remoteCommits: List<string>) =
-            match localCommits with
-            | [] -> None
-            | head :: tail ->
-                if remoteCommits.Contains head then
-                    Some tail
-                else
-                    findIntersection tail remoteCommits
-
-        Console.WriteLine "Walking tree..."
-
-        let currentHash =
-            Process
-                .ExecDefault(
-                    sprintf
-                        "git log -1 --skip=%i --format=format:%%H"
-                        currentSkipCount,
-                    echo = Echo.Off
-                )
-                .UnwrapDefault()
-                .Trim()
-
-        let newRemoteCommits =
-            (GetLastNthCommitFromRemoteBranch
-                remoteName
-                remoteBranch
-                currentSkipCount)
-            :: remoteCommits
-
-        let newLocalCommitsWalkedSoFar = currentHash :: localCommitsWalkedSoFar
-
-        match findIntersection newLocalCommitsWalkedSoFar newRemoteCommits with
-        | Some theCommitsToPush -> theCommitsToPush
-        | None ->
-            findUnpushedCommits
-                newLocalCommitsWalkedSoFar
-                (currentSkipCount + 1u)
-                newRemoteCommits
-
     GitFetch(Some remoteName)
 
     try
@@ -190,30 +196,35 @@ let FindUnpushedCommits (remoteName: string) (remoteBranch: string) =
         Environment.Exit exitCode
         failwith <| "Unreachable because of: " + errMsg
 
-    findUnpushedCommits List.empty 0u List.empty
+    FindUnpushedCommitsInternal List.empty 0u List.empty remoteName remoteBranch
+
+[<TailCall>]
+let rec private GetLastCommitsInternal
+    commitsFoundSoFar
+    currentSkipCount
+    currentCount
+    =
+    if currentCount = 0u then
+        commitsFoundSoFar
+    else
+        let currentHash =
+            Process
+                .ExecDefault(
+                    sprintf
+                        "git log -1 --skip=%i --format=format:%%H"
+                        currentSkipCount,
+                    echo = Echo.Off
+                )
+                .UnwrapDefault()
+                .Trim()
+
+        GetLastCommitsInternal
+            (currentHash :: commitsFoundSoFar)
+            (currentSkipCount + 1u)
+            (currentCount - 1u)
 
 let GetLastCommits(count: UInt32) =
-    let rec getLastCommits commitsFoundSoFar currentSkipCount currentCount =
-        if currentCount = 0u then
-            commitsFoundSoFar
-        else
-            let currentHash =
-                Process
-                    .ExecDefault(
-                        sprintf
-                            "git log -1 --skip=%i --format=format:%%H"
-                            currentSkipCount,
-                        echo = Echo.Off
-                    )
-                    .UnwrapDefault()
-                    .Trim()
-
-            getLastCommits
-                (currentHash :: commitsFoundSoFar)
-                (currentSkipCount + 1u)
-                (currentCount - 1u)
-
-    getLastCommits List.empty 0u count
+    GetLastCommitsInternal List.empty 0u count
 
 let remotes = Git.GetRemotes()
 

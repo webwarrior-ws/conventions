@@ -11,8 +11,8 @@ open System.Xml.XPath
 open Microsoft.Build.Construction
 
 type ScriptTarget =
-    | Solution of FileInfo
-    | Folder of DirectoryInfo
+    | Solution of solution: FileInfo
+    | Folder of folder: DirectoryInfo
 
 module MapHelper =
     let GetKeysOfMap(map: Map<'Key, 'Value>) : seq<'Key> =
@@ -106,18 +106,6 @@ let NormalizeDirSeparatorsPaths(path: string) : string =
         .Replace('\\', Path.DirectorySeparatorChar)
         .Replace('/', Path.DirectorySeparatorChar)
 
-let private GetAllPackageInfos
-    (packages: Map<ComparableFileInfo, seq<PackageInfo>>)
-    =
-    let pkgInfos =
-        seq {
-            for KeyValue(_, pkgs) in packages do
-                for pkg in pkgs do
-                    yield pkg
-        }
-
-    Set pkgInfos
-
 let FindProjectFiles(solutionOrFolder: ScriptTarget) : seq<FileInfo> =
     let allFiles =
         match solutionOrFolder with
@@ -134,13 +122,6 @@ let FindProjectFiles(solutionOrFolder: ScriptTarget) : seq<FileInfo> =
     |> Seq.filter(fun file ->
         [| ".fsproj"; ".csproj" |] |> Array.contains(file.Extension.ToLower())
     )
-
-
-let private NotPackagesFolder
-    (nugetSolutionPackagesDir: DirectoryInfo)
-    (dir: DirectoryInfo)
-    : bool =
-    dir.FullName <> nugetSolutionPackagesDir.FullName
 
 let private NotSubmodule
     (currentDirectory: string)
@@ -180,6 +161,12 @@ let rec private FindNuspecFiles
     (sol: FileInfo)
     (dir: DirectoryInfo)
     : seq<FileInfo> =
+    let notPackagesFolder
+        (nugetSolutionPackagesDir: DirectoryInfo)
+        (dir: DirectoryInfo)
+        : bool =
+        dir.FullName <> nugetSolutionPackagesDir.FullName
+
     dir.Refresh()
 
     seq {
@@ -191,7 +178,7 @@ let rec private FindNuspecFiles
             dir
                 .EnumerateDirectories()
                 .Where(NotSubmodule currentDirectory)
-                .Where(NotPackagesFolder nugetSolutionPackagesDir) do
+                .Where(notPackagesFolder nugetSolutionPackagesDir) do
             yield!
                 FindNuspecFiles
                     currentDirectory
@@ -233,90 +220,6 @@ let private GetPackagesInfoFromProjectFile(projectFile: FileInfo) =
                 }
     }
 
-let private GetPackageTree
-    (currentDirectory: string)
-    (nugetSolutionPackagesDir: DirectoryInfo)
-    (sol: FileInfo)
-    : Map<ComparableFileInfo, seq<PackageInfo>> =
-    let projectFiles = FindProjectFiles(Solution sol)
-
-    let projectElements =
-        seq {
-            for projectFile in projectFiles do
-                yield! GetPackagesInfoFromProjectFile projectFile
-        }
-        |> List.ofSeq
-
-    let solDir = sol.Directory
-    solDir.Refresh()
-
-    let nuspecFiles =
-        FindNuspecFiles currentDirectory nugetSolutionPackagesDir sol solDir
-
-    let nuspecFileElements =
-        seq {
-            for nuspecFile in nuspecFiles do
-                let xmlDoc = XDocument.Load nuspecFile.FullName
-
-                let nsOpt =
-                    let nsString = xmlDoc.Root.Name.Namespace.ToString()
-
-                    if String.IsNullOrEmpty nsString then
-                        None
-                    else
-                        let nsManager = XmlNamespaceManager(NameTable())
-                        let nsPrefix = "x"
-                        nsManager.AddNamespace(nsPrefix, nsString)
-
-                        if nsString
-                           <> "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd" then
-                            Console.Error.WriteLine
-                                "Warning: the namespace URL doesn't match expectations, nuspec's XPath query may result in no elements"
-
-                        Some(nsManager, sprintf "%s:" nsPrefix)
-
-                let query = "//{0}dependency"
-
-                let dependencies =
-                    match nsOpt with
-                    | None ->
-                        let fixedQuery = String.Format(query, String.Empty)
-
-                        xmlDoc.XPathSelectElements fixedQuery
-                    | Some(nsManager, nsPrefix) ->
-                        let fixedQuery = String.Format(query, nsPrefix)
-
-                        xmlDoc.XPathSelectElements(fixedQuery, nsManager)
-
-                for dependency in dependencies do
-                    let id =
-                        dependency
-                            .Attributes()
-                            .Single(fun attr -> attr.Name.LocalName = "id")
-                            .Value
-
-                    let version =
-                        dependency
-                            .Attributes()
-                            .Single(fun attr -> attr.Name.LocalName = "version")
-                            .Value
-
-                    yield
-                        {
-                            File = nuspecFile
-                        },
-                        {
-                            PackageId = id
-                            PackageVersion = version
-                            ReqReinstall = None
-                        }
-        }
-        |> List.ofSeq
-
-    let allElements = Seq.append projectElements nuspecFileElements
-
-    MapHelper.MergeIntoMap allElements
-
 let GetVersionsMap(projectFiles: #seq<FileInfo>) : Map<string, Set<string>> =
     let packageInfos =
         projectFiles |> Seq.collect GetPackagesInfoFromProjectFile
@@ -355,6 +258,104 @@ let SanityCheckNugetPackages
     (currentDirectory: string)
     (nugetSolutionPackagesDir: DirectoryInfo)
     =
+    let getAllPackageInfos
+        (packages: Map<ComparableFileInfo, seq<PackageInfo>>)
+        =
+        let pkgInfos =
+            seq {
+                for KeyValue(_, pkgs) in packages do
+                    for pkg in pkgs do
+                        yield pkg
+            }
+
+        Set pkgInfos
+
+    let getPackageTree
+        (currentDirectory: string)
+        (nugetSolutionPackagesDir: DirectoryInfo)
+        (sol: FileInfo)
+        : Map<ComparableFileInfo, seq<PackageInfo>> =
+        let projectFiles = FindProjectFiles(Solution sol)
+
+        let projectElements =
+            seq {
+                for projectFile in projectFiles do
+                    yield! GetPackagesInfoFromProjectFile projectFile
+            }
+            |> List.ofSeq
+
+        let solDir = sol.Directory
+        solDir.Refresh()
+
+        let nuspecFiles =
+            FindNuspecFiles currentDirectory nugetSolutionPackagesDir sol solDir
+
+        let nuspecFileElements =
+            seq {
+                for nuspecFile in nuspecFiles do
+                    let xmlDoc = XDocument.Load nuspecFile.FullName
+
+                    let nsOpt =
+                        let nsString = xmlDoc.Root.Name.Namespace.ToString()
+
+                        if String.IsNullOrEmpty nsString then
+                            None
+                        else
+                            let nsManager = XmlNamespaceManager(NameTable())
+                            let nsPrefix = "x"
+                            nsManager.AddNamespace(nsPrefix, nsString)
+
+                            if nsString
+                               <> "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd" then
+                                Console.Error.WriteLine
+                                    "Warning: the namespace URL doesn't match expectations, nuspec's XPath query may result in no elements"
+
+                            Some(nsManager, sprintf "%s:" nsPrefix)
+
+                    let query = "//{0}dependency"
+
+                    let dependencies =
+                        match nsOpt with
+                        | None ->
+                            let fixedQuery = String.Format(query, String.Empty)
+
+                            xmlDoc.XPathSelectElements fixedQuery
+                        | Some(nsManager, nsPrefix) ->
+                            let fixedQuery = String.Format(query, nsPrefix)
+
+                            xmlDoc.XPathSelectElements(fixedQuery, nsManager)
+
+                    for dependency in dependencies do
+                        let id =
+                            dependency
+                                .Attributes()
+                                .Single(fun attr -> attr.Name.LocalName = "id")
+                                .Value
+
+                        let version =
+                            dependency
+                                .Attributes()
+                                .Single(fun attr ->
+                                    attr.Name.LocalName = "version"
+                                )
+                                .Value
+
+                        yield
+                            {
+                                File = nuspecFile
+                            },
+                            {
+                                PackageId = id
+                                PackageVersion = version
+                                ReqReinstall = None
+                            }
+            }
+            |> List.ofSeq
+
+        let allElements = Seq.append projectElements nuspecFileElements
+
+        MapHelper.MergeIntoMap allElements
+
     let sanityCheckNugetPackagesFromSolution(sol: FileInfo) =
         let getAllPackageIdsAndVersions
             (packageTree: Map<ComparableFileInfo, seq<PackageInfo>>)
@@ -442,7 +443,7 @@ let SanityCheckNugetPackages
                 }
                 |> Set
 
-            let packageInfos = GetAllPackageInfos packageTree
+            let packageInfos = getAllPackageInfos packageTree
 
             let packageIdsWithMoreThan1Version =
                 seq {
@@ -475,7 +476,7 @@ let SanityCheckNugetPackages
                 |> Map.ofSeq
 
         let packageTree =
-            GetPackageTree currentDirectory nugetSolutionPackagesDir sol
+            getPackageTree currentDirectory nugetSolutionPackagesDir sol
 
         let packages = getAllPackageIdsAndVersions packageTree
 
@@ -547,8 +548,7 @@ let SanityCheckNugetPackages
 
         if packagesWithWithSomeReqReinstallAttrib.Any() then
             Console.Error.WriteLine(
-                sprintf
-                    "Packages found with some RequireReinstall attribute (please reinstall it before pushing):"
+                "Packages found with some RequireReinstall attribute (please reinstall it before pushing):"
             )
 
             for file, pkg in packagesWithWithSomeReqReinstallAttrib do
