@@ -1,8 +1,8 @@
 diff --git a/Dockerfile.base b/Dockerfile.base
-index 099e36d..d1078a9 100644
+index 099e36d..39a1e5c 100644
 --- a/Dockerfile.base
 +++ b/Dockerfile.base
-@@ -16,6 +16,38 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
+@@ -16,6 +16,40 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
  RUN apt --yes install --no-install-recommends npm
  RUN npm install --global yarn
  
@@ -34,6 +34,8 @@ index 099e36d..d1078a9 100644
 +# rm: cannot remove '/etc/systemd/system/xray.service.d/10-donot_touch_multi_conf.conf': No such file or directory
 +# rm: cannot remove '/etc/systemd/system/xray@.service.d/10-donot_touch_multi_conf.conf': No such file or directory
 +RUN chmod +x ./install-release.sh
++# install-release.sh will not fail trying to detect systemd if /.dockerenv file exists
++RUN touch /.dockerenv
 +RUN yes | ./install-release.sh --local ./Xray-linux-64.zip
 +RUN rm ./install-release.sh
 +RUN rm ./Xray-linux-64.zip
