@@ -25,6 +25,7 @@ export const abbr = {
     "authentication": "auth",
     "average": "avg",
     "background": "bg",
+    "because of": "due to",
     "before": "pre-",
     "binary": "bin",
     "bitcoin": "BTC",
