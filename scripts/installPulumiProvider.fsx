@@ -2,10 +2,19 @@
 
 #r "nuget: Fsdk, Version=0.9.99--date20260618-1029.git-79ec1be"
 
+open System
 open System.IO
 
 open Fsdk
 open Fsdk.Process
+
+let usage =
+    $"Usage: dotnet fsi {__SOURCE_FILE__} <provider name> <provider version>"
+
+let errorUsage = 1, usage
+
+let ErrorWget wgetExitCode =
+    2, $"wget command failed with exit code %i{wgetExitCode}"
 
 let InstallProvider (name: string) (version: string) =
     let providerName = $"pulumi-{name}"
@@ -18,15 +27,15 @@ let InstallProvider (name: string) (version: string) =
         Directory.CreateDirectory
         <| Path.Combine(providersDir.FullName, providerName)
 
-    let initialCurrentDirectory = System.Environment.CurrentDirectory
-    System.Environment.CurrentDirectory <- providerDir.FullName
+    let providerZipFile =
+        FileInfo <| Path.Combine(providerDir.FullName, $"{providerName}.zip")
 
     let wgetCommandResult =
         Process.Execute(
             {
                 Command = "wget"
                 Arguments =
-                    $"https://github.com/nodeeffect/{providerName}/releases/download/{version}/{providerName}.zip"
+                    $"--output-document={providerZipFile.FullName} https://github.com/nodeeffect/{providerName}/releases/download/{version}/{providerName}.zip"
             },
             Echo.All
         )
@@ -34,60 +43,36 @@ let InstallProvider (name: string) (version: string) =
     match wgetCommandResult.Result with
     | Success _
     | WarningsOrAmbiguous _ -> ()
-    | Error(exitCode, _) ->
-        printfn "wget command failed with exit code %i" exitCode
-        exit 3
-
-    let zipFileName = $"{providerName}.zip"
+    | Error(wgetExitCode, _) ->
+        let exitCode, errMsg = ErrorWget wgetExitCode
+        printfn "%s" errMsg
+        exit exitCode
 
     Process
-        .Execute(
-            {
-                Command = "unzip"
-                Arguments = zipFileName
-            },
+        .ExecDefault(
+            $"unzip {providerZipFile.FullName} -d {providerDir}",
             Echo.All
         )
         .UnwrapDefault()
     |> ignore<string>
 
-    File.Delete zipFileName
-
-    // Avoid error: Access to the path '/home/runner/work/pulumi-deploy/pulumi-deploy/pulumi-bitlaunch/sdk/dotnet/obj/d3c3f3c5-9946-497b-8a7e-17f0b6501f6f.tmp' is denied. [/home/runner/work/pulumi-deploy/pulumi-deploy/GithubRunner/GithubRunner.fsproj]
-    Process
-        .Execute(
-            {
-                Command = "chmod"
-                Arguments = $"--recursive 0777 ./sdk/dotnet"
-            },
-            Echo.All
-        )
-        .UnwrapDefault()
-    |> ignore<string>
+    providerZipFile.Delete()
 
     match name with
     | "bitlaunch" ->
-        Process
-            .Execute(
-                {
-                    Command = "sudo"
-                    Arguments = "cp ./bin/pulumi-resource-bitlaunch /usr/bin"
-                },
-                Echo.All
-            )
-            .UnwrapDefault()
-        |> ignore<string>
+        let bitlaunchBinaryName = "pulumi-resource-bitlaunch"
+
+        File.Copy(
+            Path.Join(providerDir.FullName, "bin", bitlaunchBinaryName),
+            Path.Join("/usr/bin", bitlaunchBinaryName)
+        )
     | _ -> ()
 
-    System.Environment.CurrentDirectory <- initialCurrentDirectory
-
 let args = Misc.FsxOnlyArguments()
-
-let usage =
-    $"Usage: dotnet fsi {__SOURCE_FILE__} <provider name> <provider version>"
 
 match args with
 | [ providerName; version ] -> InstallProvider providerName version
 | _ ->
-    printfn "%s" usage
-    exit 1
+    let exitCode, errMsg = errorUsage
+    printfn "%s" errMsg
+    exit exitCode
