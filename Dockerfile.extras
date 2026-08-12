@@ -1,8 +1,8 @@
 diff --git a/Dockerfile.base b/Dockerfile.base
-index 099e36d..46fd400 100644
+index 099e36d..f10419d 100644
 --- a/Dockerfile.base
 +++ b/Dockerfile.base
-@@ -16,6 +16,130 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
+@@ -16,6 +16,128 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
  RUN apt --yes install --no-install-recommends npm
  RUN npm install --global yarn
  
@@ -107,10 +107,8 @@ index 099e36d..46fd400 100644
 +# Pulumi CLI
 +ARG PULUMI_VERSION=3.201.0
 +RUN wget https://get.pulumi.com/releases/sdk/pulumi-v$PULUMI_VERSION-linux-x64.tar.gz --output-document=pulumi.tar.gz
-+RUN tar --extract --gzip --verbose --file pulumi.tar.gz
++RUN tar --extract --gzip --file pulumi.tar.gz --directory /usr/local/bin --strip-components=1
 +RUN rm pulumi.tar.gz
-+RUN mv ./pulumi /usr/local/bin/pulumi
-+RUN chmod +x /usr/local/bin/pulumi
 +
 +# Install Pulumi providers
 +ADD scripts/installPulumiProvider.fsx /usr/local/bin/installPulumiProvider.fsx
