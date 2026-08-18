@@ -1,5 +1,5 @@
 diff --git a/Dockerfile.base b/Dockerfile.base
-index 099e36d..f10419d 100644
+index 099e36d..874c6d5 100644
 --- a/Dockerfile.base
 +++ b/Dockerfile.base
 @@ -16,6 +16,128 @@ RUN apt --yes install --no-install-recommends dotnet-sdk-10.0
@@ -115,7 +115,7 @@ index 099e36d..f10419d 100644
 +RUN installPulumiProvider.fsx bitlaunch 0.4.2
 +RUN installPulumiProvider.fsx lnvps 0.0.47
 +RUN installPulumiProvider.fsx namesilo 0.0.7
-+RUN installPulumiProvider.fsx unhumandomains 0.0.8
++RUN installPulumiProvider.fsx unhumandomains 0.0.9
 +
 +# Install Xray (use script in latest commit in XTLS/Xray-install repo as of writing this script)
 +RUN wget https://raw.githubusercontent.com/XTLS/Xray-install/b7410c4e2fe2ed5c0ddca508eba2f4e42a91e1d2/install-release.sh
