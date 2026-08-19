@@ -1349,8 +1349,6 @@ let ciStatuses =
 
         let hasCiStatus = not(json.Contains "\"check_suites\":[]")
 
-        let _checkSuitesParsedJson = CheckSuitesType.Parse json
-
         let shouldHaveCiStatus = ShouldHaveCiStatus commitMsg
 
         hasCiStatus, shouldHaveCiStatus
