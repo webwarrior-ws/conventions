@@ -1667,7 +1667,15 @@ repository or organization and click on Actions button, then select General. Fro
 let prHeadCommitHash = parsedJsonObj.PullRequest.Head.Sha
 
 let prCommits =
-    let url = parsedJsonObj.PullRequest.Links.Commits.Href
+    /// see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-commits-on-a-pull-request
+    let maxCommitsPerPage = 100
+
+    if parsedJsonObj.PullRequest.Commits > maxCommitsPerPage then
+        failwith
+            $"More than {maxCommitsPerPage} commits in PR. This script doesn't support pagination yet."
+
+    let url =
+        $"{parsedJsonObj.PullRequest.Links.Commits.Href}?per_page={maxCommitsPerPage}"
 
     let prCommitsJsonString = GitHubApiCall url
 
