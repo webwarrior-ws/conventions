@@ -1799,14 +1799,6 @@ let rec CheckCiStatus
         else
             let latestRun =
                 actionsRunsParsedJson.WorkflowRuns
-                // discard workflow runs that are not from this PR
-                |> Seq.filter(fun run ->
-                    run.PullRequests
-                    |> Seq.exists(fun pr ->
-                        pr.Number = parsedJsonObj.PullRequest.Number
-                    )
-                )
-                // take the latest one
                 |> Seq.sortByDescending(fun run -> run.CreatedAt)
                 |> Seq.tryHead
 
