@@ -76,6 +76,7 @@ export const abbr = {
     "conversations": "convos",
     "conversion": "conv",
     "convert": "conv",
+    "convince": "coax",
     "coordinate": "coord",
     "coordinates": "coords",
     "copy": "cp",
