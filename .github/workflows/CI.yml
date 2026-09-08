@@ -119,7 +119,7 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
-        uses: nblockchain/conventions@master
+        uses: nblockchain/conventions/.github/actions/dynamic-uses/@master
         with:
           uses: actions/checkout@v${{ env.CHECKOUT_ACTION_VERSION }}
       - name: Compile the conventions solution
@@ -135,7 +135,7 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
-        uses: nblockchain/conventions@master
+        uses: nblockchain/conventions/.github/actions/dynamic-uses/@master
         with:
           uses: actions/checkout@v${{ env.CHECKOUT_ACTION_VERSION }}
       - name: Run tests to validate F# scripts
@@ -149,7 +149,7 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
-        uses: nblockchain/conventions@master
+        uses: nblockchain/conventions/.github/actions/dynamic-uses/@master
         with:
           uses: actions/checkout@v${{ env.CHECKOUT_ACTION_VERSION }}
       - name: Print versions
@@ -183,7 +183,7 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/conventions-ci:${{ needs.calc-docker-img-tag.outputs.base }}
     steps:
       - name: Run actions/checkout
-        uses: nblockchain/conventions@master
+        uses: nblockchain/conventions/.github/actions/dynamic-uses/@master
         with:
           uses: actions/checkout@v${{ env.CHECKOUT_ACTION_VERSION }}
       - name: Install yarn modules
@@ -223,7 +223,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Run actions/checkout
-        uses: nblockchain/conventions@master
+        uses: nblockchain/conventions/.github/actions/dynamic-uses/@master
         with:
           uses: actions/checkout@v${{ env.CHECKOUT_ACTION_VERSION }}
           with: |
