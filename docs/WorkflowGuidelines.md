@@ -10,6 +10,8 @@
 
 * Otherwise, PR description could be a summary of all the commits, or choose the most important commit to align with (in case the other commits don't add much substance). In this case, PR has to be merged with "Create a merge commit" button.
 
+* All information that is present in PR description should be in the commit messages as well, because this way it will be preserved in case of changing git hosting provider.
+
 * If you want to contribute a script, do not use PowerShell or Bash, but an F# script. The reason to not use PowerShell is a personal preference from the maintainer of this project (and his suspicion that it might not be 100% guaranteed to be crossplatform); and the reason not to use Bash is because it's only Unix compatible (we cannot assume WSL is installed in Windows), and in general because it's too undeterministic and old, more info here: https://news.ycombinator.com/item?id=33116310
 
 * Our naming conventions are as follows:
