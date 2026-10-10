@@ -36,5 +36,6 @@ jobs:
           provider: ppq
           model: auto
           token: ${{ secrets.PPQ_API_KEY }}
+          branch_name_template: "wip/pi/issue{number}-{title}-{timestamp}"
           extensions: |
             npm:awto-pi-lot
