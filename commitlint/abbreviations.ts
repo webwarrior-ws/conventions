@@ -285,6 +285,7 @@ export const abbr = {
     "select": "sel",
     "sequence": "seq",
     "sequences": "seqs",
+    "setting": "config",
     "seven": "7",
     "sign-in": "log-in",
     "sign-up": "signup",

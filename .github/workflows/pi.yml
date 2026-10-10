@@ -29,12 +29,45 @@ jobs:
           persist-credentials: false
 
       - name: Run Pi agent
-        # based on 3080387559da9f13ef1ebb6a6307b2d0b97a5885 = v2.29.1+ ( which depends on Pi v0.99.2 )
-        uses: tarsgate/pi-coding-agent-action@develop
+        id: pi-step
+
+        # f7496a9aea9798c5d52d39096d98d5c5b16559b3 = v2.30.0 ( which depends on Pi v1.0.4 )
+        uses: tarsgate/pi-coding-agent-action@f7496a9aea9798c5d52d39096d98d5c5b16559b3
+
+        # we want to still upload session artifacts even if it fails (to diagnose problems)
+        continue-on-error: true
+
         with:
           github_token: ${{ secrets.GH_REPO_BOT_ACCESS_TOKEN }}
           provider: ppq
           model: auto
           token: ${{ secrets.PPQ_API_KEY }}
+          branch_name_template: "wip/pi/issue{number}-{title}-{timestamp}"
+          export_session_html: true
+          export_session_jsonl: true
           extensions: |
             npm:awto-pi-lot
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ steps.pi-step.outputs.session_html_path}}
+        with:
+          name: pi-session-html-${{ github.event.issue.number || github.event.pull_request.number || github.run_number }}
+          path: |
+            ${{ steps.pi-step.outputs.session_html_path }}
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ steps.pi-step.outputs.session_jsonl_path}}
+        with:
+          name: pi-session-jsonl-${{ github.event.issue.number || github.event.pull_request.number || github.run_number }}
+          path: |
+            ${{ steps.pi-step.outputs.session_jsonl_path }}
+
+      # just to avoid "continue-on-error: true" marking this job as green if it failed
+      - name: Job Status Check
+        if: always()
+        run: |
+          if [ "${{ steps.pi-step.outcome }}" = "failure" ]; then
+            echo "The Pi step failed during execution. Marking workflow as failed."
+            exit 1
+          fi
+          echo "Workflow run successfully!"
