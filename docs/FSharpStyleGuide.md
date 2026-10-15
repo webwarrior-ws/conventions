@@ -124,6 +124,8 @@ of using the less safe approaches  `x.IsSome && x.Value = ...` or
 (And don't forget to enable FSharpLint's [FL0066 rule](https://fsprojects.github.io/FSharpLint/how-tos/rules/FL0066.html)
 with the config file in this repo to make sure you don't forget this and other
 similar cases.)
+* We prefer `Seq<'T>` over hardcoding `List<'T>` or `array<'T>` in function signatures, because this way they can accept parameters of both the latter types, not just one.
+* We prefer `List<'T>` over `array<'T>` because the former is idiomatic F# (the latter can be `null`, which is not idiomatic F#).
 * To not confuse lists/arrays of one element with indexers, we prefer to use the
 `singleton` function of the List/Array/Seq modules, instead of the less verbose
 (and easy to misinterpret, e.g. think it's a list when it's an array, or
