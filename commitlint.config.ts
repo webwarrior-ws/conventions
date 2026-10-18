@@ -27,7 +27,7 @@ function extractStringFromCommitlintParam(
 // FIXME: maybe propose PR to upstream commitlint to not have such a loosely typed API?
 function convertToCommitlintResponse(
     result: Option<string>
-): (string | boolean)[] {
+): Array<string | boolean> {
     if (result instanceof Some) {
         return [false, result.value];
     }
