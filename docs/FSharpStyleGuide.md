@@ -17,7 +17,7 @@ list instead of the F#'s immutable one. If you really really need to access the
 former, use `type MutableList<'T> = System.Collections.Generics.List<'T>` instead.
 * To not confuse array types with lists, we prefer to use `List.Empty` over `[]`
 (where it's possible; e.g. in match cases it's not possible), and `array<Foo>`
-over `Foo []`.
+over `Foo []`. (Or rather just enable FSharpLint's [FL0076 rule](https://fsprojects.github.io/FSharpLint/how-tos/rules/FL0076.html).)
 * We prefer to write parentheses only when strictly necessary (e.g. in F# they
 are not required for `if` clauses, unlike C#) or for readability purposes (e.g.
 when it's not clear what operator would be applied first, as not everyone knows

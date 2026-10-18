@@ -64,6 +64,39 @@
     }
     ```
 
+* In languages where square brackets are used for denoting arrays in type declaration, we prefer to be explicit in case the type can be expressed with the word Array/array (NOTE: in C#, the word `Array` would likely map to loosely typed `System.Array` which we don't prefer; but in this we can rather use `IEnumerable<TFoo>`, plus not needing to type `TFoo[]` again later, see below).
+
+    Example in TypeScript (bad):
+    ```typescript
+    const scores: number[] = [1, 2, 3];
+    ```
+
+    Improved code:
+    ```typescript
+    const scores: Array<number> = [1, 2, 3];
+    ```
+
+    Example in C# (bad):
+    ```csharp
+    string[] scores = [10, 20, 30];
+    ```
+
+    Improved code:
+    ```csharp
+    IEnumerable<string> scores = [10, 20, 30];
+    ```
+
+    Example in F# (bad):
+    ```fsharp
+    let scores: int[] = [| 100; 200; 300 |]
+    ```
+
+    Improved code:
+    ```fsharp
+    let scores: array<int> = [| 100; 200; 300 |]
+    ```
+    (Or rather just enable FSharpLint's [FL0011 rule](https://fsprojects.github.io/FSharpLint/how-tos/rules/FL0011.html) configured with `"mode": "Always"`.)
+
 * Respect style that aims for future maintainability:
 
     * Always use indentation when you can (for readability).

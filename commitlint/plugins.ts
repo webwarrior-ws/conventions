@@ -3,7 +3,7 @@ import { abbr } from "./abbreviations.js";
 import { Helpers } from "./helpers.js";
 
 export abstract class Plugins {
-    public static bodyProse(rawStr: string) {
+    public static bodyProse(rawStr: string): Option<string> {
         function paragraphHasValidEnding(paragraph: string): boolean {
             const paragraphWords = paragraph.split(" ");
             const lastWordInParagraph =
@@ -83,14 +83,17 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `The body of the commit message (as opposed to the commit message title) is composed of paragraphs. Please begin each paragraph with an uppercase letter and end it with a dot (or other valid character to finish a paragraph).` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static commitHashAlone(rawStr: string) {
+    public static commitHashAlone(rawStr: string): Option<string> {
         let offence = false;
 
         const urls = Helpers.findUrls(rawStr);
@@ -111,26 +114,31 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please use the commit hash instead of the commit full URL.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static emptyWip(headerStr: string) {
+    public static emptyWip(headerStr: string): Option<string> {
         const offence = headerStr.toLowerCase() === "wip";
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+        return new Some(
             `Please add a number or description after the WIP prefix.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
     public static headerMaxLengthWithSuggestions(
         headerStr: string,
         maxLineLength: number
-    ) {
+    ): Option<string> {
         let offence = false;
 
         const headerLength = headerStr.length;
@@ -145,26 +153,32 @@ export abstract class Plugins {
                 titleWithoutScope = headerStr.substring(colonIndex);
             }
 
-            const numRecomendations = 0;
+            let numRecommendations = 0;
             const lowerCaseTitleWithoutScope = titleWithoutScope.toLowerCase();
             Object.entries(abbr).forEach(([key, value]) => {
                 const pattern = new RegExp("\\b(" + key.toString() + ")\\b");
                 if (pattern.test(lowerCaseTitleWithoutScope)) {
-                    if (numRecomendations === 0) {
+                    if (numRecommendations === 0) {
                         message =
                             message +
                             " The following replacement(s) in your commit title are recommended:\n";
                     }
-
+                    numRecommendations++;
                     message = message + `"${key}" -> "${value}"\n`;
                 }
             });
         }
 
-        return [!offence, message + Helpers.errMessageSuffix];
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(message + Helpers.errMessageSuffix);
     }
 
-    public static footerNotesMisplacement(body: Option<string>) {
+    public static footerNotesMisplacement(
+        body: Option<string>
+    ): Option<string> {
         let offence = false;
 
         if (body instanceof Some) {
@@ -186,14 +200,17 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Footer messages must be placed after body paragraphs, please move any message that starts with "Fixes", "Closes" or "[i]" to the end of the commmit message.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static footerRefsValidity(rawStr: string) {
+    public static footerRefsValidity(rawStr: string): Option<string> {
         let offence = false;
         let hasEmptyFooter = false;
 
@@ -239,6 +256,10 @@ export abstract class Plugins {
             }
         }
 
+        if (!offence) {
+            return Nothing;
+        }
+
         let errorMessage =
             "All references in the body must be mentioned in the footer, and vice versa.";
 
@@ -247,10 +268,10 @@ export abstract class Plugins {
                 "A footer reference can not be empty, please make sure that you've provided the reference and there is no EOL between the reference number and the reference.";
         }
 
-        return [!offence, errorMessage + Helpers.errMessageSuffix];
+        return new Some(errorMessage + Helpers.errMessageSuffix);
     }
 
-    public static preferSlashOverBackslash(headerStr: string) {
+    public static preferSlashOverBackslash(headerStr: string): Option<string> {
         let offence = false;
 
         const colonIndex = headerStr.indexOf(":");
@@ -261,14 +282,17 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please use slash instead of backslash in the scope/sub-scope section of the title.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static properIssueRefs(rawStr: string) {
+    public static properIssueRefs(rawStr: string): Option<string> {
         let offence = false;
 
         rawStr = rawStr.trim();
@@ -283,38 +307,46 @@ export abstract class Plugins {
             offence = Helpers.includesHashtagRef(bodyStr);
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please use full URLs instead of #XYZ refs.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static titleUppercase(headerStr: string) {
+    public static titleUppercase(headerStr: string): Option<string> {
         const firstWord = headerStr.split(" ")[0];
         const offence =
             headerStr.indexOf(":") < 0 &&
             !Helpers.wordIsStartOfSentence(firstWord) &&
             !Helpers.isProperNoun(firstWord);
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+        return new Some(
             `Please start the title with an uppercase letter if you haven't specified any scope.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static tooManySpaces(rawStr: string) {
+    public static tooManySpaces(rawStr: string): Option<string> {
         rawStr = Helpers.removeAllCodeBlocks(rawStr);
         const offence = rawStr.match(`[^.]  `) !== null;
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please watch out for too many whitespaces in the text.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static typeSpaceAfterColon(headerStr: string) {
+    public static typeSpaceAfterColon(headerStr: string): Option<string> {
         const colonFirstIndex = headerStr.indexOf(":");
 
         let offence = false;
@@ -324,24 +356,30 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please place a space after the first colon character in your commit message title` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static typeWithSquareBrackets(headerStr: string) {
+    public static typeWithSquareBrackets(headerStr: string): Option<string> {
         const offence = headerStr.match(`^\\[.*\\]`) !== null;
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please use "scope/sub-scope: subject" or "scope(scope): subject" style instead of wrapping the scope details under square brackets in your commit message title` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static subjectLowercase(headerStr: string) {
+    public static subjectLowercase(headerStr: string): Option<string> {
         let offence = false;
 
         const colonFirstIndex = headerStr.indexOf(":");
@@ -355,14 +393,17 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please use lowercase as the first letter for your subject, i.e. the text after your scope (note: there is a chance that this rule is yielding a false positive in case the word '${firstWord}' is a name and must be capitalized; in which case please just reword the subject to make this word not be the first, sorry).` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static typeSpaceAfterComma(headerStr: string) {
+    public static typeSpaceAfterComma(headerStr: string): Option<string> {
         let offence = false;
 
         const colonIndex = headerStr.indexOf(":");
@@ -379,17 +420,20 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `No need to use space after comma in the scope (so that commit title can be shorter).` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
     public static bodySoftMaxLineLength(
         body: Option<string>,
         bodyMaxLineLength: number
-    ) {
+    ): Option<string> {
         let offence = false;
 
         if (body instanceof Some) {
@@ -437,19 +481,22 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please do not exceed ${bodyMaxLineLength} characters in the lines of the commit message's body; we recommend this script (for editing the last commit message): \n` +
                 "https://github.com/nblockchain/conventions/blob/master/scripts/wrapLatestCommitMsg.fsx" +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
     public static bodyParagraphLineMinLength(
         body: Option<string>,
         paragraphLineMinLength: number,
         paragraphLineMaxLength: number
-    ) {
+    ): Option<string> {
         let offence: Option<string> = Nothing;
 
         if (body instanceof Some) {
@@ -526,20 +573,16 @@ export abstract class Plugins {
         }
 
         if (offence instanceof None) {
-            return [
-                true,
-                "bodyParagraphLineMinLength's bug, this text should not be shown if offence was false",
-            ];
+            return Nothing;
         }
-        return [
-            false,
+        return new Some(
             `Please do not subceed ${paragraphLineMinLength} characters in the lines of the commit message's body paragraphs. Offending line has this text: "${offence.value}"; we recommend this script (for editing the last commit message): \n` +
                 "https://github.com/nblockchain/conventions/blob/master/scripts/wrapLatestCommitMsg.fsx" +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static trailingWhitespace(rawStr: string) {
+    public static trailingWhitespace(rawStr: string): Option<string> {
         let offence = false;
 
         let lineIndex = 0;
@@ -569,14 +612,17 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `Please watch out for leading or ending trailing whitespace: line ${lineIndex}.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 
-    public static typeSpaceBeforeParen(headerStr: string) {
+    public static typeSpaceBeforeParen(headerStr: string): Option<string> {
         let offence = false;
 
         const colonIndex = headerStr.indexOf(":");
@@ -590,10 +636,13 @@ export abstract class Plugins {
             }
         }
 
-        return [
-            !offence,
+        if (!offence) {
+            return Nothing;
+        }
+
+        return new Some(
             `No need to use space before parentheses in the scope/sub-scope section of the title.` +
-                Helpers.errMessageSuffix,
-        ];
+                Helpers.errMessageSuffix
+        );
     }
 }

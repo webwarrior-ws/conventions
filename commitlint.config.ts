@@ -2,7 +2,7 @@
 
 import { Helpers } from "./commitlint/helpers.js";
 import { Plugins } from "./commitlint/plugins.js";
-import { Dyn } from "fp-sdk";
+import { Dyn, Option, Some } from "fp-sdk";
 import { RuleConfigSeverity } from "@commitlint/types";
 
 const bodyMaxLineLength = 64;
@@ -22,6 +22,16 @@ function extractStringFromCommitlintParam(
         notStringErrorMessage(paramName)
     );
     return str;
+}
+
+// FIXME: maybe propose PR to upstream commitlint to not have such a loosely typed API?
+function convertToCommitlintResponse(
+    result: Option<string>
+): Array<string | boolean> {
+    if (result instanceof Some) {
+        return [false, result.value];
+    }
+    return [true];
 }
 
 export default {
@@ -81,13 +91,17 @@ export default {
                 "body-prose": ({ raw }: { raw: any }) => {
                     const rawStr = extractStringFromCommitlintParam("raw", raw);
 
-                    return Plugins.bodyProse(rawStr);
+                    return convertToCommitlintResponse(
+                        Plugins.bodyProse(rawStr)
+                    );
                 },
 
                 "commit-hash-alone": ({ raw }: { raw: any }) => {
                     const rawStr = extractStringFromCommitlintParam("raw", raw);
 
-                    return Plugins.commitHashAlone(rawStr);
+                    return convertToCommitlintResponse(
+                        Plugins.commitHashAlone(rawStr)
+                    );
                 },
 
                 "empty-wip": ({ header }: { header: any }) => {
@@ -96,7 +110,9 @@ export default {
                         header
                     );
 
-                    return Plugins.emptyWip(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.emptyWip(headerStr)
+                    );
                 },
 
                 "header-max-length-with-suggestions": (
@@ -109,21 +125,27 @@ export default {
                         header
                     );
 
-                    return Plugins.headerMaxLengthWithSuggestions(
-                        headerStr,
-                        maxLineLength
+                    return convertToCommitlintResponse(
+                        Plugins.headerMaxLengthWithSuggestions(
+                            headerStr,
+                            maxLineLength
+                        )
                     );
                 },
 
                 "footer-notes-misplacement": ({ body }: { body: any }) => {
                     const maybeBody = Dyn.tryCast(body).to(String);
-                    return Plugins.footerNotesMisplacement(maybeBody);
+                    return convertToCommitlintResponse(
+                        Plugins.footerNotesMisplacement(maybeBody)
+                    );
                 },
 
                 "footer-refs-validity": ({ raw }: { raw: any }) => {
                     const rawStr = extractStringFromCommitlintParam("raw", raw);
 
-                    return Plugins.footerRefsValidity(rawStr);
+                    return convertToCommitlintResponse(
+                        Plugins.footerRefsValidity(rawStr)
+                    );
                 },
 
                 "prefer-slash-over-backslash": ({
@@ -136,13 +158,17 @@ export default {
                         header
                     );
 
-                    return Plugins.preferSlashOverBackslash(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.preferSlashOverBackslash(headerStr)
+                    );
                 },
 
                 "proper-issue-refs": ({ raw }: { raw: any }) => {
                     const rawStr = extractStringFromCommitlintParam("raw", raw);
 
-                    return Plugins.properIssueRefs(rawStr);
+                    return convertToCommitlintResponse(
+                        Plugins.properIssueRefs(rawStr)
+                    );
                 },
 
                 "title-uppercase": ({ header }: { header: any }) => {
@@ -151,13 +177,17 @@ export default {
                         header
                     );
 
-                    return Plugins.titleUppercase(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.titleUppercase(headerStr)
+                    );
                 },
 
                 "too-many-spaces": ({ raw }: { raw: any }) => {
                     const rawStr = extractStringFromCommitlintParam("raw", raw);
 
-                    return Plugins.tooManySpaces(rawStr);
+                    return convertToCommitlintResponse(
+                        Plugins.tooManySpaces(rawStr)
+                    );
                 },
 
                 "type-space-after-colon": ({ header }: { header: any }) => {
@@ -166,7 +196,9 @@ export default {
                         header
                     );
 
-                    return Plugins.typeSpaceAfterColon(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.typeSpaceAfterColon(headerStr)
+                    );
                 },
 
                 "type-with-square-brackets": ({ header }: { header: any }) => {
@@ -175,7 +207,9 @@ export default {
                         header
                     );
 
-                    return Plugins.typeWithSquareBrackets(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.typeWithSquareBrackets(headerStr)
+                    );
                 },
 
                 // NOTE: we use 'header' instead of 'subject' as a workaround to this bug: https://github.com/conventional-changelog/commitlint/issues/3404
@@ -185,7 +219,9 @@ export default {
                         header
                     );
 
-                    return Plugins.subjectLowercase(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.subjectLowercase(headerStr)
+                    );
                 },
 
                 "type-space-after-comma": ({ header }: { header: any }) => {
@@ -194,7 +230,9 @@ export default {
                         notStringErrorMessage("header")
                     );
 
-                    return Plugins.typeSpaceAfterComma(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.typeSpaceAfterComma(headerStr)
+                    );
                 },
 
                 "body-soft-max-line-length": (
@@ -203,25 +241,28 @@ export default {
                     maxLineLength: number
                 ) => {
                     const maybeBody = Dyn.tryCast(body).to(String);
-                    return Plugins.bodySoftMaxLineLength(
-                        maybeBody,
-                        maxLineLength
+                    return convertToCommitlintResponse(
+                        Plugins.bodySoftMaxLineLength(maybeBody, maxLineLength)
                     );
                 },
 
                 "body-paragraph-line-min-length": ({ body }: { body: any }) => {
                     const maybeBody = Dyn.tryCast(body).to(String);
-                    return Plugins.bodyParagraphLineMinLength(
-                        maybeBody,
-                        headerMaxLineLength,
-                        bodyMaxLineLength
+                    return convertToCommitlintResponse(
+                        Plugins.bodyParagraphLineMinLength(
+                            maybeBody,
+                            headerMaxLineLength,
+                            bodyMaxLineLength
+                        )
                     );
                 },
 
                 "trailing-whitespace": ({ raw }: { raw: any }) => {
                     const rawStr = extractStringFromCommitlintParam("raw", raw);
 
-                    return Plugins.trailingWhitespace(rawStr);
+                    return convertToCommitlintResponse(
+                        Plugins.trailingWhitespace(rawStr)
+                    );
                 },
 
                 "type-space-before-paren": ({ header }: { header: any }) => {
@@ -230,7 +271,9 @@ export default {
                         header
                     );
 
-                    return Plugins.typeSpaceBeforeParen(headerStr);
+                    return convertToCommitlintResponse(
+                        Plugins.typeSpaceBeforeParen(headerStr)
+                    );
                 },
             },
         },
