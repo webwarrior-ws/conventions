@@ -145,12 +145,12 @@ export abstract class Plugins {
                 titleWithoutScope = headerStr.substring(colonIndex);
             }
 
-            const numRecomendations = 0;
+            const numRecommendations = 0;
             const lowerCaseTitleWithoutScope = titleWithoutScope.toLowerCase();
             Object.entries(abbr).forEach(([key, value]) => {
                 const pattern = new RegExp("\\b(" + key.toString() + ")\\b");
                 if (pattern.test(lowerCaseTitleWithoutScope)) {
-                    if (numRecomendations === 0) {
+                    if (numRecommendations === 0) {
                         message =
                             message +
                             " The following replacement(s) in your commit title are recommended:\n";
