@@ -1,4 +1,10 @@
-import { None, Option } from "fp-sdk";
+import { None, Some, Option, Nothing } from "fp-sdk";
+
+export type ParsedCommitMessage = {
+    header: Option<string>;
+    body: Option<string>;
+    footer: Option<string>;
+};
 
 export abstract class Helpers {
     public static errMessageSuffix =
@@ -242,5 +248,41 @@ export abstract class Helpers {
         } while (numberOfEols != 0);
 
         return preparedText.split(separator);
+    }
+
+    public static splitRawCommitMessage(
+        commitMessage: string
+    ): ParsedCommitMessage {
+        const messageWithCodeBlocksRemoved =
+            Helpers.removeAllCodeBlocks(commitMessage);
+        const paragraphs = Helpers.splitByEOLs(messageWithCodeBlocksRemoved, 2);
+        if (paragraphs.length == 0) {
+            return { header: Nothing, body: Nothing, footer: Nothing };
+        }
+
+        const header = paragraphs[0];
+
+        let body, footer;
+        const footerParagraphIndex = paragraphs.findIndex((paragraph) => {
+            const lines = Helpers.splitByEOLs(paragraph, 1);
+            return lines.some(Helpers.isFooterNote);
+        });
+        if (footerParagraphIndex == -1) {
+            body = paragraphs.slice(1, paragraphs.length).join("\n");
+            footer = Nothing;
+        } else {
+            body = paragraphs.slice(1, footerParagraphIndex).join("\n");
+            footer = new Some(
+                paragraphs
+                    .slice(footerParagraphIndex, paragraphs.length)
+                    .join("\n")
+            );
+        }
+
+        return {
+            header: new Some(header),
+            body: body == "" ? Nothing : new Some(body),
+            footer,
+        };
     }
 }
