@@ -599,6 +599,20 @@ foo bar baz.
     expect(bodyParagraphLineMinLength11Prime.status).toBe(0);
 });
 
+test("body-paragraph-line-min-length12", () => {
+    const commitMsgWithTrailerInsideCodeBlock =
+        "scripts/make.fsx: allow running with newer .NET\n\n" +
+        "So that envs that only have newer .NET version don't fail with:\n\n" +
+        "```\nYou must install or update .NET to run this application.\n\n" +
+        "App: /__w/foo/foo/src/Foo.Frontend.Console/bin/Debug/net8.0/Foo.Frontend.Console.dll\n" +
+        "```";
+
+    const bodyParagraphLineMinLength12 = runCommitLintOnMsg(
+        commitMsgWithTrailerInsideCodeBlock
+    );
+    expect(bodyParagraphLineMinLength12.status).toBe(0);
+});
+
 test("commit-hash-alone1", () => {
     const commitMsgWithCommitUrl = `foo: this is only a title
 
