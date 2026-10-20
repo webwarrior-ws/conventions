@@ -2,7 +2,7 @@
 
 import { Helpers } from "./commitlint/helpers.js";
 import { Plugins } from "./commitlint/plugins.js";
-import { Dyn, Option, Some } from "fp-sdk";
+import { Dyn, Option, Some, Nothing } from "fp-sdk";
 import { RuleConfigSeverity } from "@commitlint/types";
 
 const bodyMaxLineLength = 64;
@@ -22,6 +22,15 @@ function extractStringFromCommitlintParam(
         notStringErrorMessage(paramName)
     );
     return str;
+}
+
+function extractBodyFromCommitMsg(msg: string): Option<string> {
+    const linesBeforeBody = 2;
+    const lines = Helpers.splitByEOLs(msg, 1);
+    if (lines.length < linesBeforeBody) {
+        return Nothing;
+    }
+    return new Some(lines.slice(linesBeforeBody).join("\n"));
 }
 
 // FIXME: maybe propose PR to upstream commitlint to not have such a loosely typed API?
@@ -246,8 +255,13 @@ export default {
                     );
                 },
 
-                "body-paragraph-line-min-length": ({ body }: { body: any }) => {
-                    const maybeBody = Dyn.tryCast(body).to(String);
+                "body-paragraph-line-min-length": ({ raw }: { raw: any }) => {
+                    // workaround for conventional-changelog-conventionalcommits ( https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/conventional-changelog-conventionalcommits )
+                    // treating any `Foo: bar` string (even inside code blocks) as trailers, see https://git-scm.com/docs/git-interpret-trailers
+                    const maybeBody = extractBodyFromCommitMsg(
+                        extractStringFromCommitlintParam("raw", raw)
+                    );
+
                     return convertToCommitlintResponse(
                         Plugins.bodyParagraphLineMinLength(
                             maybeBody,

@@ -38,6 +38,8 @@ export abstract class Plugins {
         let offence = false;
 
         rawStr = rawStr.trim();
+        // TODO: should rather find the second index? because body starts at line 3
+        // FIXME: reuse extractBodyFromCommitMsg() from commitlint.config.ts
         const lineBreakIndex = rawStr.indexOf("\n");
 
         if (lineBreakIndex >= 0) {
