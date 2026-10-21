@@ -1,4 +1,4 @@
-import { None, Option } from "fp-sdk";
+import { None, Option, Some, Nothing, Empty } from "fp-sdk";
 
 export abstract class Helpers {
     public static errMessageSuffix =
@@ -242,5 +242,18 @@ export abstract class Helpers {
         } while (numberOfEols != 0);
 
         return preparedText.split(separator);
+    }
+
+    public static extractBodyFromCommitMsg(msg: string): Option<string> {
+        const linesBeforeBody = 2;
+        const lines = Helpers.splitByEOLs(msg, 1);
+        if (lines.length < linesBeforeBody) {
+            return Nothing;
+        }
+        const restOfLines = lines.slice(linesBeforeBody);
+        if (restOfLines.length == 1 && restOfLines[0] === Empty.string()) {
+            return Nothing;
+        }
+        return new Some(restOfLines.join("\n"));
     }
 }

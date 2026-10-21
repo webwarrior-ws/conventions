@@ -1,4 +1,4 @@
-import { Option, Some, None, Nothing } from "fp-sdk";
+import { Option, Some, None, Nothing, Empty } from "fp-sdk";
 import { abbr } from "./abbreviations.js";
 import { Helpers } from "./helpers.js";
 
@@ -37,19 +37,16 @@ export abstract class Plugins {
 
         let offence = false;
 
-        rawStr = rawStr.trim();
-        // TODO: should rather find the second index? because body starts at line 3
-        // FIXME: reuse extractBodyFromCommitMsg() from commitlint.config.ts
-        const lineBreakIndex = rawStr.indexOf("\n");
+        // Extracting bodyStr from rawStr rather than using body directly is a
+        // workaround for https://github.com/conventional-changelog/commitlint/issues/3412
+        const body = Helpers.extractBodyFromCommitMsg(rawStr);
 
-        if (lineBreakIndex >= 0) {
-            // Extracting bodyStr from rawStr rather than using body directly is a
-            // workaround for https://github.com/conventional-changelog/commitlint/issues/3412
-            let bodyStr = rawStr.substring(lineBreakIndex).trim();
+        if (body instanceof Some) {
+            let bodyStr = body.value;
 
             bodyStr = Helpers.removeAllCodeBlocks(bodyStr).trim();
 
-            if (bodyStr !== "") {
+            if (bodyStr.trim() !== Empty.string()) {
                 for (let paragraph of Helpers.splitByEOLs(bodyStr, 2)) {
                     paragraph = paragraph.trim();
 
