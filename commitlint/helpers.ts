@@ -1,4 +1,4 @@
-import { None, Option } from "fp-sdk";
+import { None, Option, Some, Nothing, Empty } from "fp-sdk";
 
 export abstract class Helpers {
     public static errMessageSuffix =
@@ -242,5 +242,22 @@ export abstract class Helpers {
         } while (numberOfEols != 0);
 
         return preparedText.split(separator);
+    }
+
+    // this function is needed as a workaround for 2 things:
+    // 1) conventional-changelog-conventionalcommits ( https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/conventional-changelog-conventionalcommits )
+    // treating any `Foo: bar` string (even inside code blocks) as trailers, see https://git-scm.com/docs/git-interpret-trailers
+    // 2) https://github.com/conventional-changelog/commitlint/issues/3412
+    public static extractBodyFromCommitMsg(msg: string): Option<string> {
+        const linesBeforeBody = 2;
+        const lines = Helpers.splitByEOLs(msg, 1);
+        if (lines.length < linesBeforeBody) {
+            return Nothing;
+        }
+        const restOfLines = lines.slice(linesBeforeBody);
+        if (restOfLines.length == 1 && restOfLines[0] === Empty.string()) {
+            return Nothing;
+        }
+        return new Some(restOfLines.join("\n"));
     }
 }

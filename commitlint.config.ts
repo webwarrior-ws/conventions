@@ -236,18 +236,23 @@ export default {
                 },
 
                 "body-soft-max-line-length": (
-                    { body }: { body: any },
+                    { raw }: { raw: any },
                     _: any,
                     maxLineLength: number
                 ) => {
-                    const maybeBody = Dyn.tryCast(body).to(String);
+                    const maybeBody = Helpers.extractBodyFromCommitMsg(
+                        extractStringFromCommitlintParam("raw", raw)
+                    );
                     return convertToCommitlintResponse(
                         Plugins.bodySoftMaxLineLength(maybeBody, maxLineLength)
                     );
                 },
 
-                "body-paragraph-line-min-length": ({ body }: { body: any }) => {
-                    const maybeBody = Dyn.tryCast(body).to(String);
+                "body-paragraph-line-min-length": ({ raw }: { raw: any }) => {
+                    const maybeBody = Helpers.extractBodyFromCommitMsg(
+                        extractStringFromCommitlintParam("raw", raw)
+                    );
+
                     return convertToCommitlintResponse(
                         Plugins.bodyParagraphLineMinLength(
                             maybeBody,

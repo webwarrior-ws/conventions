@@ -378,6 +378,31 @@ These mistakes were made in this GrpcService's RunIntoMeService commit: 45faeca2
     expect(bodyMaxLineLength10.status).toBe(1);
 });
 
+test("body-max-line-length11", () => {
+    const tenChars = "1234 67890";
+    const seventyChars =
+        tenChars +
+        tenChars +
+        tenChars +
+        tenChars +
+        tenChars +
+        tenChars +
+        tenChars;
+    const commitMsgWithTrailerInsideCodeBlock =
+        "scripts/make.fsx: allow running with newer .NET\n\n" +
+        "So that envs that only have newer .NET version don't fail with:\n\n" +
+        "```\nYou must install or update .NET to run this application.\n\n" +
+        "App: /__w/foo/foo/src/Foo.Frontend.Console/bin/Debug/net8.0/Foo.Frontend.Console.dll\n" +
+        "```\n\nA" +
+        seventyChars +
+        ".";
+
+    const bodyMaxLineLength11 = runCommitLintOnMsg(
+        commitMsgWithTrailerInsideCodeBlock
+    );
+    expect(bodyMaxLineLength11.status).not.toBe(0);
+});
+
 test("body-paragraph-line-min-length1", () => {
     const tenChars = "1234 67890";
     const fortyChars = tenChars + tenChars + tenChars + tenChars;
@@ -597,6 +622,20 @@ foo bar baz.
     );
 
     expect(bodyParagraphLineMinLength11Prime.status).toBe(0);
+});
+
+test("body-paragraph-line-min-length12", () => {
+    const commitMsgWithTrailerInsideCodeBlock =
+        "scripts/make.fsx: allow running with newer .NET\n\n" +
+        "So that envs that only have newer .NET version don't fail with:\n\n" +
+        "```\nYou must install or update .NET to run this application.\n\n" +
+        "App: /__w/foo/foo/src/Foo.Frontend.Console/bin/Debug/net8.0/Foo.Frontend.Console.dll\n" +
+        "```";
+
+    const bodyParagraphLineMinLength12 = runCommitLintOnMsg(
+        commitMsgWithTrailerInsideCodeBlock
+    );
+    expect(bodyParagraphLineMinLength12.status).toBe(0);
 });
 
 test("commit-hash-alone1", () => {
