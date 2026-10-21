@@ -236,19 +236,19 @@ export default {
                 },
 
                 "body-soft-max-line-length": (
-                    { body }: { body: any },
+                    { raw }: { raw: any },
                     _: any,
                     maxLineLength: number
                 ) => {
-                    const maybeBody = Dyn.tryCast(body).to(String);
+                    const maybeBody = Helpers.extractBodyFromCommitMsg(
+                        extractStringFromCommitlintParam("raw", raw)
+                    );
                     return convertToCommitlintResponse(
                         Plugins.bodySoftMaxLineLength(maybeBody, maxLineLength)
                     );
                 },
 
                 "body-paragraph-line-min-length": ({ raw }: { raw: any }) => {
-                    // workaround for conventional-changelog-conventionalcommits ( https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/conventional-changelog-conventionalcommits )
-                    // treating any `Foo: bar` string (even inside code blocks) as trailers, see https://git-scm.com/docs/git-interpret-trailers
                     const maybeBody = Helpers.extractBodyFromCommitMsg(
                         extractStringFromCommitlintParam("raw", raw)
                     );

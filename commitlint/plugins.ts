@@ -36,9 +36,6 @@ export abstract class Plugins {
         }
 
         let offence = false;
-
-        // Extracting bodyStr from rawStr rather than using body directly is a
-        // workaround for https://github.com/conventional-changelog/commitlint/issues/3412
         const body = Helpers.extractBodyFromCommitMsg(rawStr);
 
         if (body instanceof Some) {
